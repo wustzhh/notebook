@@ -1,10 +1,8 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QLineEdit, QLabel, QFrame, QScrollArea,
-    QSplitter, QSizePolicy, QStackedWidget
+    QPushButton, QLineEdit, QLabel, QFrame, QScrollArea
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QPoint, pyqtSignal
-from PyQt6.QtGui import QFont, QIcon
+from PyQt6.QtCore import Qt
 
 from .styles import *
 from .sidebar import SideBar
@@ -16,8 +14,8 @@ from .create_issue_dialog import CreateIssueDialog
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Jira - 个人记事本")
-        self.setMinimumSize(1400, 900)
+        self.setWindowTitle("个人记事本")
+        self.setMinimumSize(1200, 800)
         self.setStyleSheet(get_main_stylesheet())
         
         self.current_project_id = None
@@ -73,35 +71,27 @@ class MainWindow(QMainWindow):
         
         menu_btn = QPushButton("☰")
         menu_btn.setObjectName("navBtn")
-        menu_btn.setFixedSize(40, HEADER_HEIGHT)
+        menu_btn.setFixedSize(48, HEADER_HEIGHT)
         menu_btn.clicked.connect(self.toggle_sidebar)
         left_section.addWidget(menu_btn)
         
-        logo_btn = QPushButton("Jira")
+        logo_btn = QPushButton("📋 个人记事本")
         logo_btn.setObjectName("logoBtn")
         left_section.addWidget(logo_btn)
         
-        left_section.addSpacing(24)
-        
-        nav_items = ["仪表盘", "项目", "筛选器", "人员"]
-        for item in nav_items:
-            btn = QPushButton(item)
-            btn.setObjectName("navBtn")
-            left_section.addWidget(btn)
-        
         layout.addLayout(left_section)
-        layout.addStretch()
+        layout.addSpacing(24)
         
         center_section = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.setObjectName("searchInput")
-        self.search_input.setPlaceholderText("搜索...")
-        self.search_input.setFixedWidth(300)
+        self.search_input.setPlaceholderText("搜索任务...")
+        self.search_input.setFixedWidth(280)
         self.search_input.setFixedHeight(36)
         center_section.addWidget(self.search_input)
         
         layout.addLayout(center_section)
-        layout.addSpacing(16)
+        layout.addStretch()
         
         right_section = QHBoxLayout()
         
@@ -111,15 +101,10 @@ class MainWindow(QMainWindow):
         create_btn.clicked.connect(self.show_create_dialog)
         right_section.addWidget(create_btn)
         
-        help_btn = QPushButton("?")
-        help_btn.setObjectName("navBtn")
-        help_btn.setFixedSize(36, 36)
-        right_section.addWidget(help_btn)
-        
-        avatar_btn = QPushButton("👤")
-        avatar_btn.setObjectName("navBtn")
-        avatar_btn.setFixedSize(36, 36)
-        right_section.addWidget(avatar_btn)
+        settings_btn = QPushButton("⚙️")
+        settings_btn.setObjectName("navBtn")
+        settings_btn.setFixedSize(40, 36)
+        right_section.addWidget(settings_btn)
         
         layout.addLayout(right_section)
         
@@ -128,15 +113,16 @@ class MainWindow(QMainWindow):
     def create_page_header(self):
         page_header = QFrame()
         page_header.setObjectName("pageHeader")
-        page_header.setFixedHeight(80)
+        page_header.setFixedHeight(70)
         
         layout = QHBoxLayout(page_header)
-        layout.setContentsMargins(24, 16, 24, 16)
+        layout.setContentsMargins(24, 12, 24, 12)
         
         left_section = QVBoxLayout()
+        left_section.setSpacing(4)
         
         breadcrumb = QLabel("项目 / 默认项目")
-        breadcrumb.setStyleSheet(f"color: {NEUTRAL_70}; font-size: 14px;")
+        breadcrumb.setObjectName("breadcrumb")
         left_section.addWidget(breadcrumb)
         
         title = QLabel("任务列表")
@@ -145,20 +131,6 @@ class MainWindow(QMainWindow):
         
         layout.addLayout(left_section)
         layout.addStretch()
-        
-        right_section = QHBoxLayout()
-        
-        filter_btn = QPushButton("筛选")
-        filter_btn.setObjectName("detailBtnSecondary")
-        filter_btn.setFixedHeight(36)
-        right_section.addWidget(filter_btn)
-        
-        view_btn = QPushButton("视图 ▾")
-        view_btn.setObjectName("detailBtnSecondary")
-        view_btn.setFixedHeight(36)
-        right_section.addWidget(view_btn)
-        
-        layout.addLayout(right_section)
         
         return page_header
     
