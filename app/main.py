@@ -10,16 +10,19 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 from app.ui.main_window import MainWindow
+from app.ui.styles import get_main_stylesheet
 
 
 def main():
     app = QApplication(sys.argv)
     
-    app.setApplicationName("个人记事本")
+    app.setApplicationName("Jira - 个人记事本")
     app.setOrganizationName("Personal")
     
     font = QFont("Microsoft YaHei", 10)
     app.setFont(font)
+    
+    app.setStyleSheet(get_main_stylesheet())
     
     window = MainWindow()
     window.show()
