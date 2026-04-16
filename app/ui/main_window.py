@@ -1,9 +1,9 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLineEdit, QLabel, QFrame, QScrollArea,
-    QSizePolicy
+    QSizePolicy, QGraphicsOpacityEffect
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QSequentialAnimationGroup
+from PyQt6.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QSequentialAnimationGroup, QEasingCurve
 from PyQt6.QtGui import QFont
 
 from .styles import *
@@ -28,6 +28,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         central_widget = QWidget()
         central_widget.setObjectName("contentArea")
+        central_widget.setStyleSheet(f"background-color: {NEUTRAL_10};")
         self.setCentralWidget(central_widget)
         
         main_layout = QVBoxLayout(central_widget)
@@ -60,6 +61,9 @@ class MainWindow(QMainWindow):
         
         self.detail_panel = TaskDetailPanel(self)
         self.detail_panel.setFixedWidth(0)
+        self.detail_panel.setMinimumWidth(0)
+        self.detail_panel.setMaximumWidth(0)
+        self.detail_panel.setVisible(False)
         content_container.addWidget(self.detail_panel)
         
         main_layout.addLayout(content_container)
@@ -68,6 +72,12 @@ class MainWindow(QMainWindow):
         top_nav = QFrame()
         top_nav.setObjectName("topNav")
         top_nav.setFixedHeight(HEADER_HEIGHT)
+        top_nav.setStyleSheet(f"""
+            QFrame#topNav {{
+                background-color: {PRIMARY_DARK};
+                border-bottom: 1px solid {NEUTRAL_120};
+            }}
+        """)
         
         layout = QHBoxLayout(top_nav)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -119,6 +129,12 @@ class MainWindow(QMainWindow):
         page_header = QFrame()
         page_header.setObjectName("pageHeader")
         page_header.setFixedHeight(70)
+        page_header.setStyleSheet(f"""
+            QFrame#pageHeader {{
+                background-color: {NEUTRAL_10};
+                border-bottom: 2px solid {NEUTRAL_40};
+            }}
+        """)
         
         layout = QHBoxLayout(page_header)
         layout.setContentsMargins(24, 12, 24, 12)
@@ -149,10 +165,12 @@ class MainWindow(QMainWindow):
             self.task_list_view.create_task(task_data)
     
     def show_task_detail(self, task):
+        self.detail_panel.load_task(task)
+        
         if not self.detail_expanded:
             self.detail_expanded = True
+            self.detail_panel.setVisible(True)
             self._animate_detail_in()
-        self.detail_panel.load_task(task)
     
     def close_task_detail(self):
         if self.detail_expanded:
@@ -164,17 +182,26 @@ class MainWindow(QMainWindow):
         
         self.detail_panel.animation_in = QPropertyAnimation(self.detail_panel, b"maximumWidth")
         self.detail_panel.animation_in.setDuration(250)
+        self.detail_panel.animation_in.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.detail_panel.animation_in.setStartValue(0)
         self.detail_panel.animation_in.setEndValue(target_width)
+        self.detail_panel.animation_in.finished.connect(lambda: self.detail_panel.setMaximumWidth(9999))
         self.detail_panel.animation_in.start()
     
     def _animate_detail_out(self):
+        current_width = self.detail_panel.width()
+        
         self.detail_panel.animation_out = QPropertyAnimation(self.detail_panel, b"maximumWidth")
         self.detail_panel.animation_out.setDuration(250)
-        self.detail_panel.animation_out.setStartValue(self.detail_panel.width())
+        self.detail_panel.animation_out.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        self.detail_panel.animation_out.setStartValue(current_width)
         self.detail_panel.animation_out.setEndValue(0)
-        self.detail_panel.animation_out.finished.connect(self.detail_panel.hide)
+        self.detail_panel.animation_out.finished.connect(self._on_detail_closed)
         self.detail_panel.animation_out.start()
+    
+    def _on_detail_closed(self):
+        self.detail_panel.setVisible(False)
+        self.detail_panel.setMaximumWidth(0)
     
     def set_current_project(self, project_id):
         self.current_project_id = project_id

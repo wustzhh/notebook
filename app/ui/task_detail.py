@@ -18,7 +18,8 @@ class TaskDetailPanel(QFrame):
         self.setObjectName("detailPanel")
         self.setFixedWidth(0)
         self.setMinimumWidth(0)
-        self.setMaximumWidth(DETAIL_PANEL_WIDTH)
+        self.setMaximumWidth(0)
+        self.setVisible(False)
         
         self.setup_ui()
     
@@ -26,6 +27,12 @@ class TaskDetailPanel(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        self.setStyleSheet(f"""
+            QFrame#detailPanel {{
+                background-color: {NEUTRAL_0};
+                border-left: 2px solid {NEUTRAL_40};
+            }}
+        """)
         
         header = self.create_header()
         layout.addWidget(header)
@@ -46,24 +53,52 @@ class TaskDetailPanel(QFrame):
         
         self.title_input = QLineEdit()
         self.title_input.setPlaceholderText("添加摘要")
-        self.title_input.setObjectName("detailInput")
         self.title_input.setFixedHeight(44)
+        self.title_input.setStyleSheet(f"""
+            QLineEdit {{
+                border: 2px solid {NEUTRAL_40};
+                border-radius: 3px;
+                padding: 10px 12px;
+                color: {NEUTRAL_120};
+                font-size: 14px;
+                background-color: {NEUTRAL_0};
+            }}
+            QLineEdit:focus {{
+                border-color: {PRIMARY};
+            }}
+        """)
         self.title_input.textChanged.connect(self.on_change)
         self.content_layout.addWidget(self.title_input)
         
         self.status_label = QLabel("状态")
-        self.status_label.setObjectName("detailLabel")
+        self.status_label.setStyleSheet(f"color: {NEUTRAL_80}; font-size: 11px; font-weight: 700; text-transform: uppercase;")
         self.content_layout.addWidget(self.status_label)
         
         self.status_combo = QComboBox()
         self.status_combo.addItems(["待处理", "进行中", "已完成"])
-        self.status_combo.setObjectName("detailInput")
         self.status_combo.setFixedHeight(44)
+        self.status_combo.setStyleSheet(f"""
+            QComboBox {{
+                border: 2px solid {NEUTRAL_40};
+                border-radius: 3px;
+                padding: 10px 12px;
+                color: {NEUTRAL_120};
+                font-size: 14px;
+                background-color: {NEUTRAL_0};
+            }}
+            QComboBox:focus {{
+                border-color: {PRIMARY};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                padding-right: 8px;
+            }}
+        """)
         self.status_combo.currentTextChanged.connect(self.on_change)
         self.content_layout.addWidget(self.status_combo)
         
         self.date_label = QLabel("日期")
-        self.date_label.setObjectName("detailLabel")
+        self.date_label.setStyleSheet(f"color: {NEUTRAL_80}; font-size: 11px; font-weight: 700; text-transform: uppercase;")
         self.content_layout.addWidget(self.date_label)
         
         date_layout = QHBoxLayout()
@@ -71,14 +106,38 @@ class TaskDetailPanel(QFrame):
         
         self.start_date = QDateEdit()
         self.start_date.setCalendarPopup(True)
-        self.start_date.setObjectName("detailInput")
         self.start_date.setFixedHeight(44)
+        self.start_date.setStyleSheet(f"""
+            QDateEdit {{
+                border: 2px solid {NEUTRAL_40};
+                border-radius: 3px;
+                padding: 10px 12px;
+                color: {NEUTRAL_120};
+                font-size: 14px;
+                background-color: {NEUTRAL_0};
+            }}
+            QDateEdit:focus {{
+                border-color: {PRIMARY};
+            }}
+        """)
         self.start_date.dateChanged.connect(self.on_change)
         
         self.end_date = QDateEdit()
         self.end_date.setCalendarPopup(True)
-        self.end_date.setObjectName("detailInput")
         self.end_date.setFixedHeight(44)
+        self.end_date.setStyleSheet(f"""
+            QDateEdit {{
+                border: 2px solid {NEUTRAL_40};
+                border-radius: 3px;
+                padding: 10px 12px;
+                color: {NEUTRAL_120};
+                font-size: 14px;
+                background-color: {NEUTRAL_0};
+            }}
+            QDateEdit:focus {{
+                border-color: {PRIMARY};
+            }}
+        """)
         self.end_date.dateChanged.connect(self.on_change)
         
         date_layout.addWidget(QLabel("开始:"))
@@ -89,13 +148,25 @@ class TaskDetailPanel(QFrame):
         self.content_layout.addLayout(date_layout)
         
         self.desc_label = QLabel("描述")
-        self.desc_label.setObjectName("detailLabel")
+        self.desc_label.setStyleSheet(f"color: {NEUTRAL_80}; font-size: 11px; font-weight: 700; text-transform: uppercase;")
         self.content_layout.addWidget(self.desc_label)
         
         self.description_editor = QTextEdit()
         self.description_editor.setPlaceholderText("添加描述...")
-        self.description_editor.setObjectName("detailEditor")
         self.description_editor.setMinimumHeight(150)
+        self.description_editor.setStyleSheet(f"""
+            QTextEdit {{
+                border: 2px solid {NEUTRAL_40};
+                border-radius: 3px;
+                padding: 10px 12px;
+                color: {NEUTRAL_120};
+                font-size: 14px;
+                background-color: {NEUTRAL_0};
+            }}
+            QTextEdit:focus {{
+                border-color: {PRIMARY};
+            }}
+        """)
         self.description_editor.textChanged.connect(self.on_change)
         self.content_layout.addWidget(self.description_editor)
         
@@ -109,8 +180,13 @@ class TaskDetailPanel(QFrame):
     
     def create_header(self):
         header = QFrame()
-        header.setObjectName("detailHeader")
         header.setFixedHeight(64)
+        header.setStyleSheet(f"""
+            QFrame {{
+                background-color: {NEUTRAL_20};
+                border-bottom: 2px solid {NEUTRAL_40};
+            }}
+        """)
         
         layout = QHBoxLayout(header)
         layout.setContentsMargins(20, 16, 20, 16)
@@ -122,8 +198,20 @@ class TaskDetailPanel(QFrame):
         layout.addStretch()
         
         self.close_btn = QPushButton("✕")
-        self.close_btn.setObjectName("navBtn")
         self.close_btn.setFixedSize(36, 36)
+        self.close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {NEUTRAL_80};
+                border: none;
+                font-size: 20px;
+                border-radius: 3px;
+            }}
+            QPushButton:hover {{
+                background-color: {NEUTRAL_30};
+                color: {NEUTRAL_120};
+            }}
+        """)
         self.close_btn.clicked.connect(self.request_close)
         layout.addWidget(self.close_btn)
         
@@ -131,8 +219,13 @@ class TaskDetailPanel(QFrame):
     
     def create_footer(self):
         footer = QFrame()
-        footer.setObjectName("detailFooter")
         footer.setFixedHeight(76)
+        footer.setStyleSheet(f"""
+            QFrame {{
+                background-color: {NEUTRAL_20};
+                border-top: 2px solid {NEUTRAL_40};
+            }}
+        """)
         
         layout = QVBoxLayout(footer)
         layout.setContentsMargins(20, 16, 20, 16)
@@ -141,20 +234,59 @@ class TaskDetailPanel(QFrame):
         btn_layout.addStretch()
         
         self.delete_btn = QPushButton("删除")
-        self.delete_btn.setObjectName("detailBtnDanger")
         self.delete_btn.setFixedHeight(40)
+        self.delete_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {ERROR};
+                border: none;
+                padding: 10px 20px;
+                border-radius: 3px;
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {ERROR_LIGHT};
+            }}
+        """)
         self.delete_btn.clicked.connect(self.delete_task)
         btn_layout.addWidget(self.delete_btn)
         
         self.cancel_btn = QPushButton("取消")
-        self.cancel_btn.setObjectName("detailBtnSecondary")
         self.cancel_btn.setFixedHeight(40)
+        self.cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {NEUTRAL_30};
+                color: {NEUTRAL_100};
+                border: none;
+                padding: 10px 20px;
+                border-radius: 3px;
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {NEUTRAL_40};
+            }}
+        """)
         self.cancel_btn.clicked.connect(self.request_close)
         btn_layout.addWidget(self.cancel_btn)
         
         self.save_btn = QPushButton("保存")
-        self.save_btn.setObjectName("detailBtn")
         self.save_btn.setFixedHeight(40)
+        self.save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {PRIMARY};
+                color: {NEUTRAL_0};
+                border: none;
+                padding: 10px 20px;
+                border-radius: 3px;
+                font-size: 14px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {PRIMARY_DARK};
+            }}
+        """)
         self.save_btn.clicked.connect(self.save_task)
         btn_layout.addWidget(self.save_btn)
         
