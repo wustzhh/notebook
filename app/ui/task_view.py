@@ -25,6 +25,7 @@ class TaskListView(QScrollArea):
         """)
         
         self.container = QWidget()
+        self.container.setObjectName("contentArea")
         self.layout = QVBoxLayout(self.container)
         self.layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.layout.setSpacing(0)

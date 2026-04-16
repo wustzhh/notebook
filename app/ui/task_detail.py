@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QTextEdit, QComboBox, QPushButton, QDateEdit, QMessageBox,
     QScrollArea, QWidget
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QPoint, QDate
+from PyQt6.QtCore import Qt, QDate
 
 from .styles import *
 
@@ -16,7 +16,9 @@ class TaskDetailPanel(QFrame):
         self.has_unsaved_changes = False
         
         self.setObjectName("detailPanel")
-        self.setFixedWidth(DETAIL_PANEL_WIDTH)
+        self.setFixedWidth(0)
+        self.setMinimumWidth(0)
+        self.setMaximumWidth(DETAIL_PANEL_WIDTH)
         
         self.setup_ui()
     
@@ -203,11 +205,11 @@ class TaskDetailPanel(QFrame):
                 self.save_task()
             elif reply == QMessageBox.StandardButton.Discard:
                 self.has_unsaved_changes = False
-                self.slide_out()
+                self.main_window.close_task_detail()
             else:
                 return
         else:
-            self.slide_out()
+            self.main_window.close_task_detail()
     
     def save_task(self):
         if self.task:
@@ -223,7 +225,7 @@ class TaskDetailPanel(QFrame):
             self.has_unsaved_changes = False
             
             self.main_window.task_list_view.load_tasks()
-            self.slide_out()
+            self.main_window.close_task_detail()
     
     def delete_task(self):
         if self.task:
@@ -239,30 +241,4 @@ class TaskDetailPanel(QFrame):
                 self.task.delete()
                 self.has_unsaved_changes = False
                 self.main_window.task_list_view.load_tasks()
-                self.slide_out()
-    
-    def slide_in(self):
-        parent = self.parent()
-        if parent:
-            self.move(parent.width(), 0)
-            self.show()
-            
-            self.animation = QPropertyAnimation(self, b"pos")
-            self.animation.setDuration(250)
-            self.animation.setStartValue(QPoint(parent.width(), 0))
-            self.animation.setEndValue(QPoint(parent.width() - self.width(), 0))
-            self.animation.start()
-            
-            self.is_visible = True
-    
-    def slide_out(self):
-        parent = self.parent()
-        if parent:
-            self.animation = QPropertyAnimation(self, b"pos")
-            self.animation.setDuration(250)
-            self.animation.setStartValue(self.pos())
-            self.animation.setEndValue(QPoint(parent.width(), 0))
-            self.animation.finished.connect(self.hide)
-            self.animation.start()
-            
-            self.is_visible = False
+                self.main_window.close_task_detail()

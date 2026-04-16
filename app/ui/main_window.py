@@ -1,8 +1,10 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QLineEdit, QLabel, QFrame, QScrollArea
+    QPushButton, QLineEdit, QLabel, QFrame, QScrollArea,
+    QSizePolicy
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPropertyAnimation, QParallelAnimationGroup, QSequentialAnimationGroup
+from PyQt6.QtGui import QFont
 
 from .styles import *
 from .sidebar import SideBar
@@ -19,6 +21,8 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(get_main_stylesheet())
         
         self.current_project_id = None
+        self.detail_expanded = False
+        
         self.setup_ui()
         
     def setup_ui(self):
@@ -55,6 +59,7 @@ class MainWindow(QMainWindow):
         content_container.addWidget(self.main_content, 1)
         
         self.detail_panel = TaskDetailPanel(self)
+        self.detail_panel.setFixedWidth(0)
         content_container.addWidget(self.detail_panel)
         
         main_layout.addLayout(content_container)
@@ -144,11 +149,32 @@ class MainWindow(QMainWindow):
             self.task_list_view.create_task(task_data)
     
     def show_task_detail(self, task):
+        if not self.detail_expanded:
+            self.detail_expanded = True
+            self._animate_detail_in()
         self.detail_panel.load_task(task)
-        self.detail_panel.slide_in()
     
     def close_task_detail(self):
-        self.detail_panel.slide_out()
+        if self.detail_expanded:
+            self.detail_expanded = False
+            self._animate_detail_out()
+    
+    def _animate_detail_in(self):
+        target_width = DETAIL_PANEL_WIDTH
+        
+        self.detail_panel.animation_in = QPropertyAnimation(self.detail_panel, b"maximumWidth")
+        self.detail_panel.animation_in.setDuration(250)
+        self.detail_panel.animation_in.setStartValue(0)
+        self.detail_panel.animation_in.setEndValue(target_width)
+        self.detail_panel.animation_in.start()
+    
+    def _animate_detail_out(self):
+        self.detail_panel.animation_out = QPropertyAnimation(self.detail_panel, b"maximumWidth")
+        self.detail_panel.animation_out.setDuration(250)
+        self.detail_panel.animation_out.setStartValue(self.detail_panel.width())
+        self.detail_panel.animation_out.setEndValue(0)
+        self.detail_panel.animation_out.finished.connect(self.detail_panel.hide)
+        self.detail_panel.animation_out.start()
     
     def set_current_project(self, project_id):
         self.current_project_id = project_id

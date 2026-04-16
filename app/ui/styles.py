@@ -1,6 +1,5 @@
 """
-Jira 风格配色方案 - 简化版
-只保留核心功能的 UI 样式
+Jira 风格配色方案 - 强化边界版本
 """
 
 # 主色调
@@ -37,19 +36,18 @@ INFO_LIGHT = "#DEEBFF"
 HEADER_HEIGHT = 48
 SIDEBAR_WIDTH = 220
 SIDEBAR_COLLAPSED_WIDTH = 0
-DETAIL_PANEL_WIDTH = 500
+DETAIL_PANEL_WIDTH = 520
 ROW_HEIGHT = 48
 ROW_HEIGHT_COMPACT = 40
 
 
 def get_main_stylesheet():
-    """主样式表 - 强化边界"""
     return f"""
     QMainWindow {{
         background-color: {NEUTRAL_10};
     }}
     
-    /* ========== 顶部导航栏 - 深蓝色 ========== */
+    /* ========== 顶部导航栏 ========== */
     QFrame#topNav {{
         background-color: {PRIMARY_DARK};
         border-bottom: 1px solid {NEUTRAL_120};
@@ -65,6 +63,7 @@ def get_main_stylesheet():
     }}
     QPushButton#logoBtn:hover {{
         background-color: rgba(255,255,255,0.1);
+        border-radius: 3px;
     }}
     
     QPushButton#navBtn {{
@@ -80,8 +79,8 @@ def get_main_stylesheet():
     }}
     
     QLineEdit#searchInput {{
-        background-color: rgba(255,255,255,0.2);
-        border: 2px solid transparent;
+        background-color: rgba(255,255,255,0.24);
+        border: none;
         border-radius: 3px;
         padding: 6px 12px;
         color: {NEUTRAL_0};
@@ -89,14 +88,14 @@ def get_main_stylesheet():
     }}
     QLineEdit#searchInput:focus {{
         background-color: {NEUTRAL_0};
-        border-color: {NEUTRAL_0};
+        color: {NEUTRAL_120};
     }}
     QLineEdit#searchInput::placeholder {{
-        color: {NEUTRAL_50};
+        color: rgba(255,255,255,0.6);
     }}
     
     QPushButton#createBtn {{
-        background-color: {PRIMARY};
+        background-color: rgba(255,255,255,0.2);
         color: {NEUTRAL_0};
         border: none;
         padding: 6px 16px;
@@ -105,14 +104,13 @@ def get_main_stylesheet():
         font-weight: 500;
     }}
     QPushButton#createBtn:hover {{
-        background-color: {NEUTRAL_0};
-        color: {PRIMARY};
+        background-color: rgba(255,255,255,0.3);
     }}
     
-    /* ========== 左侧边栏 - 白色背景 ========== */
+    /* ========== 左侧边栏 ========== */
     QFrame#sidebar {{
         background-color: {NEUTRAL_0};
-        border-right: 2px solid {NEUTRAL_40};
+        border-right: 1px solid {NEUTRAL_40};
     }}
     
     QPushButton#sidebarItem {{
@@ -144,13 +142,18 @@ def get_main_stylesheet():
     }}
     
     /* ========== 内容区域 ========== */
-    QFrame#contentArea {{
+    QWidget#contentArea {{
         background-color: {NEUTRAL_10};
     }}
     
     QFrame#pageHeader {{
         background-color: {NEUTRAL_10};
-        border-bottom: 2px solid {NEUTRAL_40};
+        border-bottom: 1px solid {NEUTRAL_40};
+    }}
+    
+    QLabel#breadcrumb {{
+        color: {NEUTRAL_80};
+        font-size: 14px;
     }}
     
     QLabel#pageTitle {{
@@ -159,16 +162,11 @@ def get_main_stylesheet():
         font-weight: 600;
     }}
     
-    QLabel#breadcrumb {{
-        color: {NEUTRAL_80};
-        font-size: 14px;
-    }}
-    
-    /* ========== 任务列表 ========== */
+    /* ========== 任务列表容器 - 卡片式 ========== */
     QFrame#taskListContainer {{
         background-color: {NEUTRAL_0};
         border: 1px solid {NEUTRAL_40};
-        border-radius: 6px;
+        border-radius: 3px;
     }}
     
     QFrame#taskListHeader {{
@@ -180,7 +178,6 @@ def get_main_stylesheet():
         color: {NEUTRAL_100};
         font-size: 12px;
         font-weight: 700;
-        text-transform: uppercase;
     }}
     
     QFrame#taskRow {{
@@ -199,7 +196,6 @@ def get_main_stylesheet():
     QLabel#taskSummary {{
         color: {NEUTRAL_120};
         font-size: 14px;
-        font-weight: 500;
     }}
     
     /* ========== 状态标签 ========== */
@@ -235,24 +231,24 @@ def get_main_stylesheet():
     /* ========== 项目头部 ========== */
     QFrame#projectHeader {{
         background-color: {NEUTRAL_0};
-        border-bottom: 2px solid {NEUTRAL_40};
+        border-bottom: 1px solid {NEUTRAL_40};
         border-top: 1px solid {NEUTRAL_40};
     }}
     
     /* ========== 详情面板 ========== */
     QFrame#detailPanel {{
         background-color: {NEUTRAL_0};
-        border-left: 2px solid {NEUTRAL_40};
+        border-left: 1px solid {NEUTRAL_40};
     }}
     
     QFrame#detailHeader {{
         background-color: {NEUTRAL_20};
-        border-bottom: 2px solid {NEUTRAL_40};
+        border-bottom: 1px solid {NEUTRAL_40};
     }}
     
     QFrame#detailFooter {{
         background-color: {NEUTRAL_20};
-        border-top: 2px solid {NEUTRAL_40};
+        border-top: 1px solid {NEUTRAL_40};
     }}
     
     QLabel#detailTitle {{
@@ -266,6 +262,7 @@ def get_main_stylesheet():
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
+        margin-top: 16px;
     }}
     
     QLineEdit#detailInput {{
@@ -355,7 +352,6 @@ def get_main_stylesheet():
         selection-color: {PRIMARY};
     }}
     
-    /* ========== 日期编辑 ========== */
     QDateEdit {{
         background-color: {NEUTRAL_0};
         border: 2px solid {NEUTRAL_40};
@@ -383,7 +379,6 @@ def get_main_stylesheet():
         background-color: {NEUTRAL_10};
         width: 10px;
         border-radius: 5px;
-        border: 1px solid {NEUTRAL_20};
     }}
     QScrollBar::handle:vertical {{
         background-color: {NEUTRAL_50};
