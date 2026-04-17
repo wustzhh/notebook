@@ -27,7 +27,18 @@
 
       <div class="card-footer">
         <StatusTag :status="task.status" />
-        <div v-if="task.end_date" class="due-date">
+        <template v-if="hasSubtasks">
+          <div class="subtask-progress">
+            <el-progress
+              :percentage="progress.percent"
+              :stroke-width="4"
+              :show-text="false"
+              :color="progressColor"
+            />
+            <span class="progress-text">{{ progress.done }}/{{ progress.total }}</span>
+          </div>
+        </template>
+        <div v-else-if="task.end_date" class="due-date">
           <el-icon><Calendar /></el-icon>
           <span>{{ formatDate(task.end_date) }}</span>
         </div>
@@ -37,9 +48,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import dayjs from 'dayjs'
 import { Rank, Calendar } from '@element-plus/icons-vue'
+import { useTaskStore } from '@/stores/taskStore'
 import PriorityBadge from '@/components/common/PriorityBadge.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import type { Task } from '@/types/task'
@@ -54,7 +66,18 @@ const emit = defineEmits<{
   (e: 'drag-end'): void
 }>()
 
+const taskStore = useTaskStore()
+
 const isDragging = ref(false)
+
+const hasSubtasks = computed(() => taskStore.hasSubtasks(props.task.id))
+const progress = computed(() => taskStore.getSubtaskProgress(props.task.id))
+
+const progressColor = computed(() => {
+  if (progress.value.percent === 100) return '#67c23a'
+  if (progress.value.percent > 0) return '#409eff'
+  return '#909399'
+})
 
 function handleDragStart(event: DragEvent) {
   isDragging.value = true
@@ -171,6 +194,27 @@ function formatDate(date: string) {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+}
+
+.subtask-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.subtask-progress :deep(.el-progress) {
+  flex: 1;
+  min-width: 0;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  transition: color 0.3s ease;
 }
 
 .due-date {

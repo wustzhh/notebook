@@ -32,6 +32,7 @@ export interface TaskCreateData {
 export interface TaskUpdateData {
   title?: string
   description?: string
+  parent_id?: number | null
   status?: TaskStatus
   priority?: TaskPriority
   start_date?: string | null

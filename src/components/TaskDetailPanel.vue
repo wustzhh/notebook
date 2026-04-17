@@ -12,6 +12,14 @@
         <p class="value">{{ task.project_key }}-{{ task.id }}</p>
       </div>
 
+      <!-- 父任务信息 -->
+      <div v-if="task.parent_id" class="field-group">
+        <label>父任务</label>
+        <p class="value parent-link clickable" @click="openParentTask">
+          {{ parentTask?.project_key }}-{{ parentTask?.id }} {{ parentTask?.title }}
+        </p>
+      </div>
+
       <!-- 标题 (可编辑) -->
       <div class="field-group" :class="{ editing: editingField === 'title' }">
         <label @click="startEdit('title')">标题</label>
@@ -111,6 +119,64 @@
         </p>
       </div>
 
+      <!-- 子任务区域 -->
+      <div v-if="!task.parent_id" class="field-group subtask-section">
+        <div class="subtask-header">
+          <label>子任务</label>
+          <span class="subtask-count">{{ subtasks.length }}</span>
+        </div>
+
+        <!-- 子任务列表 -->
+        <div v-if="subtasks.length > 0" class="subtask-list">
+          <div
+            v-for="subtask in subtasks"
+            :key="subtask.id"
+            class="subtask-item"
+            :class="{ done: subtask.status === 'done' }"
+          >
+            <el-checkbox
+              :model-value="subtask.status === 'done'"
+              @change="(val) => toggleSubtaskDone(subtask.id, val as boolean)"
+            />
+            <span class="subtask-key">{{ task.project_key }}-{{ subtask.id }}</span>
+            <span class="subtask-title" @click="openSubtaskDetail(subtask.id)">{{ subtask.title }}</span>
+            <StatusTag :status="subtask.status" size="small" />
+          </div>
+        </div>
+
+        <!-- 添加子任务 -->
+        <div class="subtask-add">
+          <template v-if="!showAddSubtask">
+            <el-button link type="primary" size="small" @click="showAddSubtask = true">
+              <el-icon><Plus /></el-icon>
+              添加子任务
+            </el-button>
+          </template>
+          <div v-else class="subtask-form">
+            <el-input
+              ref="subtaskInputRef"
+              v-model="newSubtaskTitle"
+              placeholder="输入子任务标题"
+              size="small"
+              @keyup.enter="handleAddSubtask"
+              @blur="cancelAddSubtask"
+            />
+          </div>
+        </div>
+
+        <!-- 总进度 -->
+        <div v-if="subtasks.length > 0" class="subtask-summary">
+          <span class="summary-label">总进度</span>
+          <el-progress
+            :percentage="subtaskProgress.percent"
+            :stroke-width="6"
+            :show-text="false"
+            :color="subtaskProgressColor"
+          />
+          <span class="summary-text">{{ subtaskProgress.done }}/{{ subtaskProgress.total }}</span>
+        </div>
+      </div>
+
       <!-- 时间信息 (只读) -->
       <div class="field-group">
         <label>创建时间</label>
@@ -135,7 +201,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
 import dayjs from 'dayjs'
-import { Close } from '@element-plus/icons-vue'
+import { Close, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUIStore } from '@/stores/uiStore'
 import { useTaskStore } from '@/stores/taskStore'
@@ -147,9 +213,22 @@ const uiStore = useUIStore()
 const taskStore = useTaskStore()
 
 const task = computed(() => uiStore.viewingTask)
+const subtasks = computed(() => task.value ? taskStore.getSubtasks(task.value.id) : [])
+const subtaskProgress = computed(() => task.value ? taskStore.getSubtaskProgress(task.value.id) : { done: 0, total: 0, percent: 0 })
+const parentTask = computed(() => task.value?.parent_id ? taskStore.tasks.find(t => t.id === task.value!.parent_id) : null)
+
+const subtaskProgressColor = computed(() => {
+  if (subtaskProgress.value.percent === 100) return '#67c23a'
+  if (subtaskProgress.value.percent > 0) return '#409eff'
+  return '#909399'
+})
 
 const editingField = ref<string | null>(null)
 const editForm = ref<Partial<Task>>({})
+
+const showAddSubtask = ref(false)
+const newSubtaskTitle = ref('')
+const subtaskInputRef = ref()
 
 const titleInputRef = ref()
 const descInputRef = ref()
@@ -158,6 +237,17 @@ const descInputRef = ref()
 watch(task, () => {
   editingField.value = null
   editForm.value = {}
+  showAddSubtask.value = false
+  newSubtaskTitle.value = ''
+})
+
+// 监听显示添加子任务，自动聚焦
+watch(showAddSubtask, (val) => {
+  if (val) {
+    nextTick(() => {
+      subtaskInputRef.value?.focus()
+    })
+  }
 })
 
 function formatDateTime(date: string) {
@@ -215,6 +305,46 @@ async function handleDelete() {
   if (task.value) {
     await taskStore.deleteTask(task.value.id)
     uiStore.closeTaskDetail()
+  }
+}
+
+// 子任务相关操作
+async function toggleSubtaskDone(subtaskId: number, done: boolean) {
+  try {
+    await taskStore.toggleSubtaskDone(subtaskId, done)
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
+  }
+}
+
+async function handleAddSubtask() {
+  if (!task.value || !newSubtaskTitle.value.trim()) return
+
+  try {
+    await taskStore.createSubtask(task.value.id, {
+      title: newSubtaskTitle.value.trim()
+    })
+    newSubtaskTitle.value = ''
+    showAddSubtask.value = false
+    ElMessage.success('子任务已添加')
+  } catch (e: any) {
+    ElMessage.error(e.message || '添加失败')
+  }
+}
+
+function cancelAddSubtask() {
+  if (!newSubtaskTitle.value.trim()) {
+    showAddSubtask.value = false
+  }
+}
+
+function openSubtaskDetail(subtaskId: number) {
+  uiStore.openTaskDetail(subtaskId)
+}
+
+function openParentTask() {
+  if (parentTask.value) {
+    uiStore.openTaskDetail(parentTask.value.id)
   }
 }
 </script>
@@ -283,6 +413,16 @@ async function handleDelete() {
   transition: color 0.3s ease;
 }
 
+/* 父任务链接 */
+.parent-link {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.parent-link:hover {
+  color: var(--link-color, #409eff);
+}
+
 /* 可点击提示 */
 .clickable {
   cursor: pointer;
@@ -311,6 +451,108 @@ async function handleDelete() {
 
 .field-group.editing:last-child {
   border-radius: 0 0 4px 4px;
+}
+
+/* 子任务区域 */
+.subtask-section {
+  background: var(--bg-secondary);
+  margin: 0 -20px 20px;
+  padding: 12px 20px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.subtask-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.subtask-header label {
+  margin-bottom: 0;
+}
+
+.subtask-count {
+  font-size: 11px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.subtask-list {
+  margin-bottom: 8px;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-color);
+  transition: border-color 0.3s ease;
+}
+
+.subtask-item:last-child {
+  border-bottom: none;
+}
+
+.subtask-item.done .subtask-title {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.subtask-key {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.subtask-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subtask-title:hover {
+  color: var(--link-color, #409eff);
+}
+
+.subtask-add {
+  margin-bottom: 8px;
+}
+
+.subtask-form {
+  margin-top: 4px;
+}
+
+.subtask-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.summary-text {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  min-width: 28px;
+  text-align: right;
+}
+
+.subtask-summary :deep(.el-progress) {
+  flex: 1;
 }
 
 .panel-footer {

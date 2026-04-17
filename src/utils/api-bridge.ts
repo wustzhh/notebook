@@ -1,24 +1,63 @@
 /**
  * API 桥接层
- * 在浏览器环境下模拟 Electron IPC 调用
+ * 在浏览器环境下使用 localStorage 模拟 Electron IPC 调用
  * 在 Electron 环境下使用真实的 IPC
  */
 
-// 内存存储（用于浏览器环境）
-let mockTasks: any[] = [
-  { id: 1, title: '完成项目需求文档', description: '编写详细的项目需求文档', project_id: 1, project_name: 'Default Project', project_key: 'DEF', status: 'done', priority: 'high', start_date: null, end_date: null, position: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 2, title: '设计数据库架构', description: '设计任务管理系统的数据库架构', project_id: 1, project_name: 'Default Project', project_key: 'DEF', status: 'in_progress', priority: 'high', start_date: null, end_date: null, position: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 3, title: '实现用户认证', description: '实现用户登录和注册功能', project_id: 1, project_name: 'Default Project', project_key: 'DEF', status: 'todo', priority: 'medium', start_date: null, end_date: null, position: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 4, title: '前端页面开发', description: '使用 Vue3 和 Element Plus 开发前端页面', project_id: 1, project_name: 'Default Project', project_key: 'DEF', status: 'todo', priority: 'medium', start_date: null, end_date: null, position: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  { id: 5, title: '测试和部署', description: '进行单元测试并部署应用', project_id: 1, project_name: 'Default Project', project_key: 'DEF', status: 'todo', priority: 'low', start_date: null, end_date: null, position: 4, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-]
+const STORAGE_KEY = 'task-tracker-mock-data'
 
-let mockProjects: any[] = [
-  { id: 1, name: 'Default Project', key: 'DEF', color: '#4A90D9', description: '默认项目', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-]
+interface StoredData {
+  tasks: any[]
+  projects: any[]
+  nextTaskId: number
+  nextProjectId: number
+}
 
-let nextTaskId = 6
-let nextProjectId = 2
+// 从 localStorage 加载数据，如果没有则使用默认数据
+function loadFromStorage(): StoredData {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      return JSON.parse(raw)
+    }
+  } catch (e) {
+    console.warn('Failed to load from localStorage, using defaults:', e)
+  }
+
+  // 默认数据
+  return {
+    tasks: [
+      { id: 1, title: '完成项目需求文档', description: '编写详细的项目需求文档', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'done', priority: 'high', start_date: null, end_date: null, position: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      { id: 2, title: '设计数据库架构', description: '设计任务管理系统的数据库架构', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'in_progress', priority: 'high', start_date: null, end_date: null, position: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      { id: 3, title: '实现用户认证', description: '实现用户登录和注册功能', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'todo', priority: 'medium', start_date: null, end_date: null, position: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      { id: 4, title: '前端页面开发', description: '使用 Vue3 和 Element Plus 开发前端页面', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'todo', priority: 'medium', start_date: null, end_date: null, position: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      { id: 5, title: '测试和部署', description: '进行单元测试并部署应用', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'todo', priority: 'low', start_date: null, end_date: null, position: 4, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    ],
+    projects: [
+      { id: 1, name: 'Default Project', key: 'DEF', color: '#4A90D9', description: '默认项目', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    ],
+    nextTaskId: 6,
+    nextProjectId: 2
+  }
+}
+
+// 保存到 localStorage
+function saveToStorage(data: StoredData) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  } catch (e) {
+    console.error('Failed to save to localStorage:', e)
+  }
+}
+
+// 加载初始数据
+let store = loadFromStorage()
+
+// 内存中的可变数据
+let mockTasks: any[] = store.tasks
+let mockProjects: any[] = store.projects
+let nextTaskId = store.nextTaskId
+let nextProjectId = store.nextProjectId
 
 // 模拟延迟
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -40,13 +79,15 @@ const mockTaskAPI = {
     const newTask = {
       id: nextTaskId++,
       ...data,
-      project_name: 'Default Project',
-      project_key: 'DEF',
+      project_name: data.project_id === 1 ? 'Default Project' : mockProjects.find(p => p.id === data.project_id)?.name || 'Unknown',
+      project_key: data.project_id === 1 ? 'DEF' : mockProjects.find(p => p.id === data.project_id)?.key || 'UNK',
       position: mockTasks.filter(t => t.status === (data.status || 'todo')).length,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
     mockTasks.push(newTask)
+    store = { tasks: mockTasks, projects: mockProjects, nextTaskId, nextProjectId }
+    saveToStorage(store)
     return newTask
   },
 
@@ -59,6 +100,8 @@ const mockTaskAPI = {
         ...data,
         updated_at: new Date().toISOString()
       }
+      store = { tasks: mockTasks, projects: mockProjects, nextTaskId, nextProjectId }
+      saveToStorage(store)
       return mockTasks[index]
     }
     return null
@@ -67,6 +110,8 @@ const mockTaskAPI = {
   async delete(id: number) {
     await delay(200)
     mockTasks = mockTasks.filter(t => t.id !== id)
+    store = { tasks: mockTasks, projects: mockProjects, nextTaskId, nextProjectId }
+    saveToStorage(store)
   },
 
   async reorder(updates: Array<{ id: number; status: string; position: number }>) {
@@ -79,6 +124,8 @@ const mockTaskAPI = {
         task.updated_at = new Date().toISOString()
       }
     }
+    store = { tasks: mockTasks, projects: mockProjects, nextTaskId, nextProjectId }
+    saveToStorage(store)
   }
 }
 
@@ -103,6 +150,8 @@ const mockProjectAPI = {
       updated_at: new Date().toISOString()
     }
     mockProjects.push(newProject)
+    store = { tasks: mockTasks, projects: mockProjects, nextTaskId, nextProjectId }
+    saveToStorage(store)
     return newProject
   },
 
@@ -115,6 +164,8 @@ const mockProjectAPI = {
         ...data,
         updated_at: new Date().toISOString()
       }
+      store = { tasks: mockTasks, projects: mockProjects, nextTaskId, nextProjectId }
+      saveToStorage(store)
       return mockProjects[index]
     }
     return null
@@ -123,18 +174,20 @@ const mockProjectAPI = {
   async delete(id: number) {
     await delay(200)
     mockProjects = mockProjects.filter(p => p.id !== id)
+    store = { tasks: mockTasks, projects: mockProjects, nextTaskId, nextProjectId }
+    saveToStorage(store)
   }
 }
 
 // 判断是否在 Electron 环境中（通过检测 window.taskAPI 是否存在）
-const isElectron = typeof window !== 'undefined' && 
+const isElectron = typeof window !== 'undefined' &&
   (window as any).taskAPI !== undefined
 
-// 导出 API - 浏览器环境用 mock，Electron 环境用真实 IPC
-export const taskAPI = isElectron 
-  ? (window as any).taskAPI 
+// 导出 API - 浏览器环境用 mock（带 localStorage），Electron 环境用真实 IPC
+export const taskAPI = isElectron
+  ? (window as any).taskAPI
   : mockTaskAPI
 
-export const projectAPI = isElectron 
-  ? (window as any).projectAPI 
+export const projectAPI = isElectron
+  ? (window as any).projectAPI
   : mockProjectAPI

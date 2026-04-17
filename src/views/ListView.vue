@@ -2,7 +2,9 @@
   <div class="list-view-wrapper">
     <div class="list-view">
       <el-table
-        :data="filteredTasks"
+        :data="filteredParentTasks"
+        row-key="id"
+        :tree-props="{ children: 'subtasks', hasChildren: 'hasSubtasks' }"
         style="width: 100%"
         stripe
         @row-click="handleRowClick"
@@ -61,26 +63,52 @@ import TaskDetailPanel from '@/components/TaskDetailPanel.vue'
 const taskStore = useTaskStore()
 const uiStore = useUIStore()
 
-const filteredTasks = computed(() => {
-  let tasks = taskStore.currentProjectTasks
+const filteredParentTasks = computed(() => {
+  let parentTasks = taskStore.parentTasks
 
   if (uiStore.filterStatus !== 'all') {
-    tasks = tasks.filter(t => t.status === uiStore.filterStatus)
+    parentTasks = parentTasks.filter(t => t.status === uiStore.filterStatus)
   }
 
   if (uiStore.filterPriority !== 'all') {
-    tasks = tasks.filter(t => t.priority === uiStore.filterPriority)
+    parentTasks = parentTasks.filter(t => t.priority === uiStore.filterPriority)
   }
 
   if (uiStore.searchQuery) {
     const query = uiStore.searchQuery.toLowerCase()
-    tasks = tasks.filter(t =>
+    parentTasks = parentTasks.filter(t =>
       t.title.toLowerCase().includes(query) ||
       t.description?.toLowerCase().includes(query)
     )
   }
 
-  return tasks
+  // 为父任务附加子任务数据（树形结构）
+  return parentTasks.map(task => {
+    let subtasks = taskStore.getSubtasks(task.id)
+
+    // 应用筛选到子任务
+    if (uiStore.filterStatus !== 'all') {
+      subtasks = subtasks.filter(t => t.status === uiStore.filterStatus)
+    }
+
+    if (uiStore.filterPriority !== 'all') {
+      subtasks = subtasks.filter(t => t.priority === uiStore.filterPriority)
+    }
+
+    if (uiStore.searchQuery) {
+      const query = uiStore.searchQuery.toLowerCase()
+      subtasks = subtasks.filter(t =>
+        t.title.toLowerCase().includes(query) ||
+        t.description?.toLowerCase().includes(query)
+      )
+    }
+
+    return {
+      ...task,
+      subtasks,
+      hasSubtasks: subtasks.length > 0
+    }
+  })
 })
 
 function formatDate(date: string) {
@@ -88,6 +116,8 @@ function formatDate(date: string) {
 }
 
 function handleRowClick(row: any) {
+  // 点击子任务行时不打开详情面板（避免误触展开）
+  if (row.parent_id) return
   uiStore.openTaskDetail(row.id)
 }
 
@@ -126,6 +156,20 @@ onMounted(async () => {
 
 :deep(.el-table__row:hover) {
   background-color: var(--bg-hover) !important;
+}
+
+/* 子任务行样式 */
+:deep(.el-table__row .cell .task-title) {
+  font-size: 13px;
+}
+
+:deep(.el-table .el-table__row--level-1) {
+  background-color: var(--bg-secondary);
+}
+
+:deep(.el-table .el-table__row--level-1 .task-title::before) {
+  content: '└─ ';
+  color: var(--text-tertiary);
 }
 
 :deep(.el-table) {

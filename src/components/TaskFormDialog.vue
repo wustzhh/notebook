@@ -24,6 +24,22 @@
         />
       </el-form-item>
 
+      <el-form-item label="父任务">
+        <el-select
+          v-model="formData.parent_id"
+          placeholder="选择父任务（可选）"
+          clearable
+          style="width: 100%"
+        >
+          <el-option
+            v-for="task in parentTaskOptions"
+            :key="task.id"
+            :label="`${task.project_key}-${task.id} ${task.title}`"
+            :value="task.id"
+          />
+        </el-select>
+      </el-form-item>
+
       <el-row :gutter="16">
         <el-col :span="12">
           <el-form-item label="状态" prop="status">
@@ -111,6 +127,7 @@ const visible = computed({
 const formData = ref({
   title: '',
   description: '',
+  parent_id: null as number | null,
   status: 'todo',
   priority: 'medium',
   start_date: null as string | null,
@@ -124,10 +141,16 @@ const rules: FormRules = {
   ]
 }
 
+// 父任务选项：当前项目下的所有父任务
+const parentTaskOptions = computed(() => {
+  return taskStore.parentTasks.filter(t => t.project_id === projectStore.currentProjectId)
+})
+
 function resetForm() {
   formData.value = {
     title: '',
     description: '',
+    parent_id: null,
     status: 'todo',
     priority: 'medium',
     start_date: null,
@@ -150,8 +173,14 @@ async function handleSubmit() {
     submitting.value = true
     try {
       await taskStore.createTask({
-        ...formData.value,
-        project_id: projectStore.currentProjectId
+        title: formData.value.title,
+        description: formData.value.description || '',
+        project_id: projectStore.currentProjectId,
+        parent_id: formData.value.parent_id,
+        status: formData.value.status,
+        priority: formData.value.priority,
+        start_date: formData.value.start_date,
+        end_date: formData.value.end_date
       })
       ElMessage.success('任务创建成功')
       handleClose()

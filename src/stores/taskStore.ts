@@ -22,7 +22,12 @@ export const useTaskStore = defineStore('tasks', () => {
     return tasks.value.filter(t => t.project_id === projectStore.currentProjectId)
   })
 
-  // 按状态分组（基于当前项目）
+  // 只获取父任务（排除子任务，用于看板和列表视图）
+  const parentTasks = computed(() => {
+    return currentProjectTasks.value.filter(t => t.parent_id === null)
+  })
+
+  // 按状态分组（基于当前项目的父任务，子任务不显示在看板列中）
   const tasksByStatus = computed(() => {
     const grouped: Record<TaskStatus, Task[]> = {
       todo: [],
@@ -31,7 +36,7 @@ export const useTaskStore = defineStore('tasks', () => {
       done: []
     }
 
-    currentProjectTasks.value.forEach(task => {
+    parentTasks.value.forEach(task => {
       if (grouped[task.status]) {
         grouped[task.status].push(task)
       }
@@ -221,6 +226,78 @@ export const useTaskStore = defineStore('tasks', () => {
     selectedTaskId.value = taskId
   }
 
+  // 子任务相关方法
+
+  // 获取某任务的子任务列表
+  function getSubtasks(parentId: number): Task[] {
+    return tasks.value
+      .filter(t => t.parent_id === parentId)
+      .sort((a, b) => a.position - b.position)
+  }
+
+  // 获取某任务是否有子任务
+  function hasSubtasks(taskId: number): boolean {
+    return tasks.value.some(t => t.parent_id === taskId)
+  }
+
+  // 获取子任务完成进度
+  function getSubtaskProgress(parentId: number): { done: number; total: number; percent: number } {
+    const subtasks = getSubtasks(parentId)
+    const total = subtasks.length
+    const done = subtasks.filter(t => t.status === 'done').length
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0
+    return { done, total, percent }
+  }
+
+  // 创建子任务
+  async function createSubtask(parentId: number, data: {
+    title: string
+    description?: string
+    status?: TaskStatus
+    priority?: TaskPriority
+  }) {
+    const subtasks = getSubtasks(parentId)
+    const position = subtasks.length
+
+    try {
+      const parentTask = tasks.value.find(t => t.id === parentId)
+      if (!parentTask) throw new Error('父任务不存在')
+
+      const newTask = await taskService.create({
+        title: data.title,
+        description: data.description || '',
+        project_id: parentTask.project_id,
+        parent_id: parentId,
+        status: data.status || 'todo',
+        priority: data.priority || 'medium',
+        position
+      })
+      tasks.value.push(newTask)
+      return newTask
+    } catch (e: any) {
+      error.value = e.message
+      console.error('Failed to create subtask:', e)
+      throw e
+    }
+  }
+
+  // 切换子任务完成状态（快捷操作）
+  async function toggleSubtaskDone(subtaskId: number, done: boolean) {
+    try {
+      const newStatus: TaskStatus = done ? 'done' : 'todo'
+      const updatedTask = await taskService.update(subtaskId, { status: newStatus })
+      const index = tasks.value.findIndex(t => t.id === subtaskId)
+      if (index !== -1) {
+        tasks.value[index] = updatedTask
+      }
+      return updatedTask
+    } catch (e: any) {
+      error.value = e.message
+      console.error('Failed to toggle subtask:', e)
+      throw e
+    }
+  }
+
   function clearError() {
     error.value = null
   }
@@ -228,6 +305,7 @@ export const useTaskStore = defineStore('tasks', () => {
   return {
     tasks,
     currentProjectTasks,
+    parentTasks,
     currentProjectTaskCount,
     selectedTaskId,
     selectedTask,
@@ -245,6 +323,11 @@ export const useTaskStore = defineStore('tasks', () => {
     updateTaskPosition,
     moveTask,
     selectTask,
+    getSubtasks,
+    hasSubtasks,
+    getSubtaskProgress,
+    createSubtask,
+    toggleSubtaskDone,
     clearError
   }
 })
