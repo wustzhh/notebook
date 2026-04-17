@@ -59,21 +59,28 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUIStore } from '@/stores/uiStore'
 import { useThemeStore } from '@/stores/themeStore'
+import { useProjectStore } from '@/stores/projectStore'
 import { Plus } from '@element-plus/icons-vue'
 import DarkModeToggle from '@/components/common/DarkModeToggle.vue'
 
 const themeStore = useThemeStore()
+const projectStore = useProjectStore()
 
 const route = useRoute()
 const uiStore = useUIStore()
 
-const title = computed(() => {
+const pageTitle = computed(() => {
   const titles: Record<string, string> = {
     '/board': '看板',
     '/list': '任务列表',
     '/settings': '设置'
   }
   return titles[route.path] || 'Task Tracker'
+})
+
+const title = computed(() => {
+  const projectName = projectStore.currentProject?.name || '未选择项目'
+  return `${pageTitle.value} - ${projectName}`
 })
 
 const searchQuery = computed({

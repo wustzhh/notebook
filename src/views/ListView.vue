@@ -62,7 +62,7 @@ const taskStore = useTaskStore()
 const uiStore = useUIStore()
 
 const filteredTasks = computed(() => {
-  let tasks = taskStore.tasks
+  let tasks = taskStore.currentProjectTasks
 
   if (uiStore.filterStatus !== 'all') {
     tasks = tasks.filter(t => t.status === uiStore.filterStatus)

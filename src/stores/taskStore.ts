@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { taskService } from '@/services/taskService'
+import { useProjectStore } from './projectStore'
 import type { Task, TaskStatus, TaskCreateData, TaskUpdateData } from '@/types/task'
 
 export const useTaskStore = defineStore('tasks', () => {
@@ -15,6 +16,13 @@ export const useTaskStore = defineStore('tasks', () => {
     tasks.value.find(t => t.id === selectedTaskId.value)
   )
 
+  // 按当前项目过滤的任务
+  const projectStore = useProjectStore()
+  const currentProjectTasks = computed(() => {
+    return tasks.value.filter(t => t.project_id === projectStore.currentProjectId)
+  })
+
+  // 按状态分组（基于当前项目）
   const tasksByStatus = computed(() => {
     const grouped: Record<TaskStatus, Task[]> = {
       todo: [],
@@ -23,7 +31,7 @@ export const useTaskStore = defineStore('tasks', () => {
       done: []
     }
 
-    tasks.value.forEach(task => {
+    currentProjectTasks.value.forEach(task => {
       if (grouped[task.status]) {
         grouped[task.status].push(task)
       }
@@ -41,6 +49,9 @@ export const useTaskStore = defineStore('tasks', () => {
   const inProgressTasks = computed(() => tasksByStatus.value.in_progress)
   const reviewTasks = computed(() => tasksByStatus.value.review)
   const doneTasks = computed(() => tasksByStatus.value.done)
+
+  // 当前项目的任务总数
+  const currentProjectTaskCount = computed(() => currentProjectTasks.value.length)
 
   // Actions
   async function loadTasks() {
@@ -216,6 +227,8 @@ export const useTaskStore = defineStore('tasks', () => {
 
   return {
     tasks,
+    currentProjectTasks,
+    currentProjectTaskCount,
     selectedTaskId,
     selectedTask,
     tasksByStatus,
