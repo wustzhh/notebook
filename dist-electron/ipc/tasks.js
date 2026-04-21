@@ -9,7 +9,6 @@ export function registerTaskHandlers(mainWindow) {
         SELECT t.*, p.name as project_name, p.key as project_key
         FROM tasks t
         LEFT JOIN projects p ON t.project_id = p.id
-        WHERE t.parent_id IS NULL
         ORDER BY t.position
       `);
             return tasks;
@@ -94,6 +93,10 @@ export function registerTaskHandlers(mainWindow) {
             if (data.end_date !== undefined) {
                 fields.push('end_date = ?');
                 values.push(data.end_date);
+            }
+            if (data.parent_id !== undefined) {
+                fields.push('parent_id = ?');
+                values.push(data.parent_id);
             }
             fields.push('updated_at = CURRENT_TIMESTAMP');
             values.push(id);

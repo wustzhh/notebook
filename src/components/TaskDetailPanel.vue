@@ -51,8 +51,8 @@
         </span>
       </div>
 
-      <!-- 优先级 (可编辑) -->
-      <div class="field-group" :class="{ editing: editingField === 'priority' }">
+      <!-- 优先级 (可编辑) - 仅父任务显示 -->
+      <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'priority' }">
         <label @click="startEdit('priority')">优先级</label>
         <template v-if="editingField === 'priority'">
           <el-select v-model="editForm.priority" @change="saveField('priority')" size="default">
@@ -67,8 +67,8 @@
         </span>
       </div>
 
-      <!-- 开始日期 (可编辑) -->
-      <div class="field-group" :class="{ editing: editingField === 'start_date' }">
+      <!-- 开始日期 (可编辑) - 仅父任务显示 -->
+      <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'start_date' }">
         <label @click="startEdit('start_date')">开始日期</label>
         <template v-if="editingField === 'start_date'">
           <el-date-picker
@@ -84,8 +84,8 @@
         <p v-else class="value clickable" @click="startEdit('start_date')">{{ task.start_date || '-' }}</p>
       </div>
 
-      <!-- 截止日期 (可编辑) -->
-      <div class="field-group" :class="{ editing: editingField === 'end_date' }">
+      <!-- 截止日期 (可编辑) - 仅父任务显示 -->
+      <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'end_date' }">
         <label @click="startEdit('end_date')">截止日期</label>
         <template v-if="editingField === 'end_date'">
           <el-date-picker
@@ -101,8 +101,8 @@
         <p v-else class="value clickable" @click="startEdit('end_date')">{{ task.end_date || '-' }}</p>
       </div>
 
-      <!-- 描述 (可编辑) -->
-      <div class="field-group" :class="{ editing: editingField === 'description' }">
+      <!-- 描述 (可编辑) - 仅父任务显示 -->
+      <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'description' }">
         <label @click="startEdit('description')">描述</label>
         <template v-if="editingField === 'description'">
           <el-input
@@ -119,8 +119,8 @@
         </p>
       </div>
 
-      <!-- 子任务区域 -->
-      <div v-if="!task.parent_id" class="field-group subtask-section">
+      <!-- 子任务区域 - 仅父任务显示 -->
+      <div v-if="!isSubtask" class="field-group subtask-section">
         <div class="subtask-header">
           <label>子任务</label>
           <span class="subtask-count">{{ subtasks.length }}</span>
@@ -213,8 +213,26 @@ const uiStore = useUIStore()
 const taskStore = useTaskStore()
 
 const task = computed(() => uiStore.viewingTask)
-const subtasks = computed(() => task.value ? taskStore.getSubtasks(task.value.id) : [])
-const subtaskProgress = computed(() => task.value ? taskStore.getSubtaskProgress(task.value.id) : { done: 0, total: 0, percent: 0 })
+
+// 判断是否是子任务
+const isSubtask = computed(() => task.value?.parent_id !== null)
+
+// 直接访问 taskStore.tasks 以确保响应式追踪
+const subtasks = computed(() => {
+  if (!task.value) return []
+  return taskStore.tasks
+    .filter(t => t.parent_id === task.value!.id)
+    .sort((a, b) => a.position - b.position)
+})
+
+const subtaskProgress = computed(() => {
+  if (!task.value) return { done: 0, total: 0, percent: 0 }
+  const subtasksVal = subtasks.value
+  const total = subtasksVal.length
+  const done = subtasksVal.filter(t => t.status === 'done').length
+  return { done, total, percent: total > 0 ? Math.round((done / total) * 100) : 0 }
+})
+
 const parentTask = computed(() => task.value?.parent_id ? taskStore.tasks.find(t => t.id === task.value!.parent_id) : null)
 
 const subtaskProgressColor = computed(() => {

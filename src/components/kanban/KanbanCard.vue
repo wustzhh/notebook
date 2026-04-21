@@ -25,6 +25,46 @@
         {{ task.description }}
       </p>
 
+      <!-- 子任务列表（带分页） -->
+      <div v-if="hasSubtasks" class="subtask-list">
+        <!-- 分页控制 -->
+        <div v-if="totalPages > 1" class="subtask-pagination">
+          <el-button 
+            size="small" 
+            text 
+            :disabled="currentPage === 1"
+            @click.stop="currentPage--"
+          >
+            <el-icon><ArrowLeft /></el-icon>
+          </el-button>
+          <span class="page-info">{{ currentPage }}/{{ totalPages }}</span>
+          <el-button 
+            size="small" 
+            text 
+            :disabled="currentPage === totalPages"
+            @click.stop="currentPage++"
+          >
+            <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </div>
+        
+        <!-- 子任务列表 -->
+        <div
+          v-for="subtask in paginatedSubtasks"
+          :key="subtask.id"
+          class="subtask-item"
+          :class="{ done: subtask.status === 'done' }"
+        >
+          <el-checkbox
+            :model-value="subtask.status === 'done'"
+            @change="(val) => toggleSubtaskDone(subtask.id, val as boolean)"
+            @click.stop
+          />
+          <span class="subtask-key">{{ task.project_key }}-{{ subtask.id }}</span>
+          <span class="subtask-title">{{ subtask.title }}</span>
+        </div>
+      </div>
+
       <div class="card-footer">
         <StatusTag :status="task.status" />
         <template v-if="hasSubtasks">
@@ -48,10 +88,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import dayjs from 'dayjs'
-import { Rank, Calendar } from '@element-plus/icons-vue'
+import { Rank, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useTaskStore } from '@/stores/taskStore'
+import { useUIStore } from '@/stores/uiStore'
 import PriorityBadge from '@/components/common/PriorityBadge.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import type { Task } from '@/types/task'
@@ -67,11 +109,61 @@ const emit = defineEmits<{
 }>()
 
 const taskStore = useTaskStore()
+const uiStore = useUIStore()
 
 const isDragging = ref(false)
+const currentPage = ref(1)
+const PAGE_SIZE = 3
 
-const hasSubtasks = computed(() => taskStore.hasSubtasks(props.task.id))
-const progress = computed(() => taskStore.getSubtaskProgress(props.task.id))
+// 直接访问 taskStore.tasks 以确保响应式追踪
+const hasSubtasks = computed(() => 
+  taskStore.tasks.some(t => t.parent_id === props.task.id)
+)
+
+const progress = computed(() => {
+  const subtasks = taskStore.tasks.filter(t => t.parent_id === props.task.id)
+  const total = subtasks.length
+  const done = subtasks.filter(t => t.status === 'done').length
+  return { 
+    done, 
+    total, 
+    percent: total > 0 ? Math.round((done / total) * 100) : 0 
+  }
+})
+
+// 所有子任务（按 position 排序）
+const allSubtasks = computed(() => 
+  taskStore.tasks
+    .filter(t => t.parent_id === props.task.id)
+    .sort((a, b) => a.position - b.position)
+)
+
+// 总页数
+const totalPages = computed(() => 
+  Math.ceil(allSubtasks.value.length / PAGE_SIZE)
+)
+
+// 当前页的子任务
+const paginatedSubtasks = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  const end = start + PAGE_SIZE
+  return allSubtasks.value.slice(start, end)
+})
+
+// 当任务切换时重置页码
+watch(() => props.task.id, () => {
+  currentPage.value = 1
+})
+
+// 切换子任务完成状态
+async function toggleSubtaskDone(subtaskId: number, done: boolean) {
+  try {
+    await taskStore.toggleSubtaskDone(subtaskId, done)
+    ElMessage.success(done ? '子任务已完成' : '子任务已设为待办')
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
+  }
+}
 
 const progressColor = computed(() => {
   if (progress.value.percent === 100) return '#67c23a'
@@ -187,6 +279,70 @@ function formatDate(date: string) {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  transition: color 0.3s ease;
+}
+
+/* 子任务列表 */
+.subtask-list {
+  margin: 8px 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  transition: border-color 0.3s ease;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.subtask-item:hover {
+  background: var(--bg-hover);
+}
+
+.subtask-item.done .subtask-title {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
+}
+
+.subtask-key {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  min-width: 35px;
+  transition: color 0.3s ease;
+}
+
+.subtask-title {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
+}
+
+/* 分页控制 */
+.subtask-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0 8px;
+}
+
+.page-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: center;
   transition: color 0.3s ease;
 }
 
