@@ -1,11 +1,14 @@
-import { ipcMain } from 'electron';
-import { initDatabase, queryAll, queryOne, execute } from '../database.js';
-export function registerProjectHandlers(mainWindow) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.registerProjectHandlers = registerProjectHandlers;
+const electron_1 = require("electron");
+const database_js_1 = require("../database.js");
+function registerProjectHandlers(mainWindow) {
     // 获取所有项目
-    ipcMain.handle('projects:get-all', async () => {
+    electron_1.ipcMain.handle('projects:get-all', async () => {
         try {
-            await initDatabase();
-            const projects = queryAll('SELECT * FROM projects ORDER BY created_at');
+            await (0, database_js_1.initDatabase)();
+            const projects = (0, database_js_1.queryAll)('SELECT * FROM projects ORDER BY created_at');
             return projects;
         }
         catch (error) {
@@ -14,10 +17,10 @@ export function registerProjectHandlers(mainWindow) {
         }
     });
     // 获取单个项目
-    ipcMain.handle('projects:get-by-id', async (_event, id) => {
+    electron_1.ipcMain.handle('projects:get-by-id', async (_event, id) => {
         try {
-            await initDatabase();
-            const project = queryOne('SELECT * FROM projects WHERE id = ?', [id]);
+            await (0, database_js_1.initDatabase)();
+            const project = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
             return project;
         }
         catch (error) {
@@ -26,16 +29,16 @@ export function registerProjectHandlers(mainWindow) {
         }
     });
     // 创建项目
-    ipcMain.handle('projects:create', async (_event, projectData) => {
+    electron_1.ipcMain.handle('projects:create', async (_event, projectData) => {
         try {
-            await initDatabase();
-            const id = execute('INSERT INTO projects (name, key, color, description) VALUES (?, ?, ?, ?)', [
+            await (0, database_js_1.initDatabase)();
+            const id = (0, database_js_1.execute)('INSERT INTO projects (name, key, color, description) VALUES (?, ?, ?, ?)', [
                 projectData.name,
                 projectData.key,
                 projectData.color || '#4A90D9',
                 projectData.description || ''
             ]);
-            const newProject = queryOne('SELECT * FROM projects WHERE id = ?', [id]);
+            const newProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('project-created', newProject);
             return newProject;
@@ -46,9 +49,9 @@ export function registerProjectHandlers(mainWindow) {
         }
     });
     // 更新项目
-    ipcMain.handle('projects:update', async (_event, id, data) => {
+    electron_1.ipcMain.handle('projects:update', async (_event, id, data) => {
         try {
-            await initDatabase();
+            await (0, database_js_1.initDatabase)();
             const fields = [];
             const values = [];
             if (data.name !== undefined) {
@@ -65,8 +68,8 @@ export function registerProjectHandlers(mainWindow) {
             }
             fields.push('updated_at = CURRENT_TIMESTAMP');
             values.push(id);
-            execute(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);
-            const updatedProject = queryOne('SELECT * FROM projects WHERE id = ?', [id]);
+            (0, database_js_1.execute)(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);
+            const updatedProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('project-updated', updatedProject);
             return updatedProject;
@@ -77,10 +80,10 @@ export function registerProjectHandlers(mainWindow) {
         }
     });
     // 删除项目
-    ipcMain.handle('projects:delete', async (_event, id) => {
+    electron_1.ipcMain.handle('projects:delete', async (_event, id) => {
         try {
-            await initDatabase();
-            execute('DELETE FROM projects WHERE id = ?', [id]);
+            await (0, database_js_1.initDatabase)();
+            (0, database_js_1.execute)('DELETE FROM projects WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('project-deleted', id);
         }

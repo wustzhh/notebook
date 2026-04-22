@@ -1,17 +1,29 @@
-import initSqlJs from 'sql.js';
-import { app } from 'electron';
-import fs from 'fs';
-import path from 'path';
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.initDatabase = initDatabase;
+exports.saveDatabase = saveDatabase;
+exports.getDatabase = getDatabase;
+exports.queryToObjects = queryToObjects;
+exports.queryAll = queryAll;
+exports.queryOne = queryOne;
+exports.execute = execute;
+const sql_js_1 = __importDefault(require("sql.js"));
+const electron_1 = require("electron");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 let db = null;
-const DB_PATH = path.join(app.getPath('userData'), 'tasktracker.db');
+const DB_PATH = path_1.default.join(electron_1.app.getPath('userData'), 'tasktracker.db');
 // 初始化数据库
-export async function initDatabase() {
+async function initDatabase() {
     if (db)
         return db;
-    const SQL = await initSqlJs();
+    const SQL = await (0, sql_js_1.default)();
     // 如果数据库文件存在，加载它
-    if (fs.existsSync(DB_PATH)) {
-        const fileBuffer = fs.readFileSync(DB_PATH);
+    if (fs_1.default.existsSync(DB_PATH)) {
+        const fileBuffer = fs_1.default.readFileSync(DB_PATH);
         db = new SQL.Database(fileBuffer);
     }
     else {
@@ -78,22 +90,22 @@ function createTables() {
     }
 }
 // 保存数据库到文件
-export function saveDatabase() {
+function saveDatabase() {
     if (!db)
         return;
     const data = db.export();
     const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
+    fs_1.default.writeFileSync(DB_PATH, buffer);
 }
 // 获取数据库实例
-export function getDatabase() {
+function getDatabase() {
     if (!db) {
         throw new Error('Database not initialized. Call initDatabase() first.');
     }
     return db;
 }
 // 将查询结果转换为对象数组
-export function queryToObjects(stmt) {
+function queryToObjects(stmt) {
     const columns = stmt.getColumnNames();
     const values = stmt.getAsObject({});
     const results = [];
@@ -108,7 +120,7 @@ export function queryToObjects(stmt) {
     return results;
 }
 // 辅助函数：执行查询并返回对象数组
-export function queryAll(sql, params = []) {
+function queryAll(sql, params = []) {
     const database = getDatabase();
     const stmt = database.prepare(sql);
     stmt.bind(params);
@@ -126,12 +138,12 @@ export function queryAll(sql, params = []) {
     return results;
 }
 // 辅助函数：执行单行查询
-export function queryOne(sql, params = []) {
+function queryOne(sql, params = []) {
     const results = queryAll(sql, params);
     return results.length > 0 ? results[0] : null;
 }
 // 辅助函数：执行插入/更新/删除
-export function execute(sql, params = []) {
+function execute(sql, params = []) {
     const database = getDatabase();
     database.run(sql, params);
     saveDatabase();

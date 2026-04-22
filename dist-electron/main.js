@@ -1,13 +1,16 @@
-import { app, BrowserWindow } from 'electron';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { registerTaskHandlers } from './ipc/tasks.js';
-import { registerProjectHandlers } from './ipc/projects.js';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const electron_1 = require("electron");
+const path_1 = __importDefault(require("path"));
+const tasks_js_1 = require("./ipc/tasks.js");
+const projects_js_1 = require("./ipc/projects.js");
+// __dirname 在 CommonJS 中全局可用，无需声明
 let mainWindow = null;
 function createWindow() {
-    mainWindow = new BrowserWindow({
+    mainWindow = new electron_1.BrowserWindow({
         width: 1400,
         height: 900,
         minWidth: 1000,
@@ -15,7 +18,7 @@ function createWindow() {
         show: false,
         frame: true,
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
+            preload: path_1.default.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: true
@@ -28,7 +31,7 @@ function createWindow() {
     }
     else {
         // 生产环境加载打包后的文件
-        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+        mainWindow.loadFile(path_1.default.join(__dirname, '../dist/index.html'));
     }
     mainWindow.once('ready-to-show', () => {
         mainWindow?.show();
@@ -38,20 +41,20 @@ function createWindow() {
     });
 }
 // 应用准备就绪
-app.whenReady().then(() => {
+electron_1.app.whenReady().then(() => {
     createWindow();
     // 注册 IPC 处理器
-    registerTaskHandlers(mainWindow);
-    registerProjectHandlers(mainWindow);
-    app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
+    (0, tasks_js_1.registerTaskHandlers)(mainWindow);
+    (0, projects_js_1.registerProjectHandlers)(mainWindow);
+    electron_1.app.on('activate', () => {
+        if (electron_1.BrowserWindow.getAllWindows().length === 0) {
             createWindow();
         }
     });
 });
 // 所有窗口关闭时退出应用（macOS 除外）
-app.on('window-all-closed', () => {
+electron_1.app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
-        app.quit();
+        electron_1.app.quit();
     }
 });

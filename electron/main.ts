@@ -1,11 +1,9 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { registerTaskHandlers } from './ipc/tasks.js'
 import { registerProjectHandlers } from './ipc/projects.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+// __dirname 在 CommonJS 中全局可用，无需声明
 
 let mainWindow: BrowserWindow | null = null
 

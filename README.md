@@ -42,13 +42,66 @@ npm run dev:vite
 npm run dev:electron
 ```
 
-### 构建生产版本
+### 构建生产版本（打包为独立 EXE）
 
 ```bash
 npm run build
 ```
 
-构建后的可执行文件将位于 `release/` 目录。
+这个命令会依次执行：
+1. `npm run build:vite` - 打包 Vue 前端代码到 `dist/`
+2. `npm run build:electron` - 编译 Electron 主进程到 `dist-electron/`
+3. `electron-builder` - 生成 Windows 可执行文件
+
+**输出位置：** `release/` 目录
+
+**生成的文件：**
+- `Task Tracker Setup x.x.x.exe` - 安装程序（推荐分发）
+- `Task Tracker x.x.x.exe` - 免安装便携版（在 `win-unpacked/` 目录）
+
+---
+
+### 只打包 Windows 版本（可选）
+
+如果只想打包 Windows exe，可以分步执行：
+
+```bash
+# 1. 打包前端
+npm run build:vite
+
+# 2. 编译 Electron 主进程
+npm run build:electron
+
+# 3. 只打包 Windows 版本
+npx electron-builder --win
+```
+
+---
+
+### 打包注意事项
+
+1. **首次打包较慢** - 需要下载 Electron 运行时和打包工具，耐心等待
+2. **打包大小** - 约 100-150MB（包含 Electron 运行时）
+3. **图标文件** - 确保 `public/icon.ico` 存在，否则打包会报错
+4. **Node 版本** - 建议使用 Node.js 18 或更高版本
+
+---
+
+### 数据存储位置
+
+打包后的应用数据存储在系统用户目录：
+
+**Windows:**
+```
+C:\Users\<用户名>\AppData\Roaming\com.tasktracker.app\tasktracker.db
+```
+
+**快速访问数据目录：**
+1. 按 `Win + R`
+2. 输入 `%APPDATA%\com.tasktracker.app\`
+3. 回车即可打开
+
+**备份数据：** 复制 `tasktracker.db` 文件即可备份所有任务数据。
 
 ## 项目结构
 

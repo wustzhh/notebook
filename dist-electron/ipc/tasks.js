@@ -1,11 +1,14 @@
-import { ipcMain } from 'electron';
-import { initDatabase, queryAll, queryOne, execute, saveDatabase } from '../database.js';
-export function registerTaskHandlers(mainWindow) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.registerTaskHandlers = registerTaskHandlers;
+const electron_1 = require("electron");
+const database_js_1 = require("../database.js");
+function registerTaskHandlers(mainWindow) {
     // 获取所有任务
-    ipcMain.handle('tasks:get-all', async () => {
+    electron_1.ipcMain.handle('tasks:get-all', async () => {
         try {
-            await initDatabase();
-            const tasks = queryAll(`
+            await (0, database_js_1.initDatabase)();
+            const tasks = (0, database_js_1.queryAll)(`
         SELECT t.*, p.name as project_name, p.key as project_key
         FROM tasks t
         LEFT JOIN projects p ON t.project_id = p.id
@@ -19,10 +22,10 @@ export function registerTaskHandlers(mainWindow) {
         }
     });
     // 获取单个任务
-    ipcMain.handle('tasks:get-by-id', async (_event, id) => {
+    electron_1.ipcMain.handle('tasks:get-by-id', async (_event, id) => {
         try {
-            await initDatabase();
-            const task = queryOne(`
+            await (0, database_js_1.initDatabase)();
+            const task = (0, database_js_1.queryOne)(`
         SELECT t.*, p.name as project_name, p.key as project_key
         FROM tasks t
         LEFT JOIN projects p ON t.project_id = p.id
@@ -36,13 +39,13 @@ export function registerTaskHandlers(mainWindow) {
         }
     });
     // 创建任务
-    ipcMain.handle('tasks:create', async (_event, taskData) => {
+    electron_1.ipcMain.handle('tasks:create', async (_event, taskData) => {
         try {
-            await initDatabase();
+            await (0, database_js_1.initDatabase)();
             // 获取当前最大 position
-            const maxPosResult = queryOne('SELECT MAX(position) as max_pos FROM tasks WHERE status = ?', [taskData.status || 'todo']);
+            const maxPosResult = (0, database_js_1.queryOne)('SELECT MAX(position) as max_pos FROM tasks WHERE status = ?', [taskData.status || 'todo']);
             const newPosition = (maxPosResult?.max_pos || 0) + 1;
-            const id = execute(`INSERT INTO tasks (title, description, project_id, parent_id, status, priority, start_date, end_date, position)
+            const id = (0, database_js_1.execute)(`INSERT INTO tasks (title, description, project_id, parent_id, status, priority, start_date, end_date, position)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                 taskData.title,
                 taskData.description || '',
@@ -54,7 +57,7 @@ export function registerTaskHandlers(mainWindow) {
                 taskData.end_date || null,
                 newPosition
             ]);
-            const newTask = queryOne('SELECT * FROM tasks WHERE id = ?', [id]);
+            const newTask = (0, database_js_1.queryOne)('SELECT * FROM tasks WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('task-created', newTask);
             return newTask;
@@ -65,9 +68,9 @@ export function registerTaskHandlers(mainWindow) {
         }
     });
     // 更新任务
-    ipcMain.handle('tasks:update', async (_event, id, data) => {
+    electron_1.ipcMain.handle('tasks:update', async (_event, id, data) => {
         try {
-            await initDatabase();
+            await (0, database_js_1.initDatabase)();
             const fields = [];
             const values = [];
             if (data.title !== undefined) {
@@ -100,8 +103,8 @@ export function registerTaskHandlers(mainWindow) {
             }
             fields.push('updated_at = CURRENT_TIMESTAMP');
             values.push(id);
-            execute(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`, values);
-            const updatedTask = queryOne('SELECT * FROM tasks WHERE id = ?', [id]);
+            (0, database_js_1.execute)(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`, values);
+            const updatedTask = (0, database_js_1.queryOne)('SELECT * FROM tasks WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('task-updated', updatedTask);
             return updatedTask;
@@ -112,10 +115,10 @@ export function registerTaskHandlers(mainWindow) {
         }
     });
     // 删除任务
-    ipcMain.handle('tasks:delete', async (_event, id) => {
+    electron_1.ipcMain.handle('tasks:delete', async (_event, id) => {
         try {
-            await initDatabase();
-            execute('DELETE FROM tasks WHERE id = ?', [id]);
+            await (0, database_js_1.initDatabase)();
+            (0, database_js_1.execute)('DELETE FROM tasks WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('task-deleted', id);
         }
@@ -125,14 +128,14 @@ export function registerTaskHandlers(mainWindow) {
         }
     });
     // 重新排序任务（拖拽后）
-    ipcMain.handle('tasks:reorder', async (_event, updates) => {
+    electron_1.ipcMain.handle('tasks:reorder', async (_event, updates) => {
         try {
-            await initDatabase();
+            await (0, database_js_1.initDatabase)();
             // 使用事务批量更新
             for (const update of updates) {
-                execute('UPDATE tasks SET status = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [update.status, update.position, update.id]);
+                (0, database_js_1.execute)('UPDATE tasks SET status = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [update.status, update.position, update.id]);
             }
-            saveDatabase();
+            (0, database_js_1.saveDatabase)();
             // 通知渲染进程刷新
             mainWindow.webContents.send('tasks-reordered');
         }
