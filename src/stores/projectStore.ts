@@ -35,7 +35,12 @@ export const useProjectStore = defineStore('projects', () => {
   async function createProject(data: ProjectCreateData) {
     try {
       const newProject = await projectService.create(data)
-      projects.value.push(newProject)
+      // 检查返回值是否有效
+      if (!newProject) {
+        throw new Error('创建项目失败：返回空值')
+      }
+      // 使用数组替换而非 push，确保触发响应式更新
+      projects.value = [...projects.value, newProject]
       return newProject
     } catch (e: any) {
       error.value = e.message
@@ -47,10 +52,8 @@ export const useProjectStore = defineStore('projects', () => {
   async function updateProject(id: number, data: ProjectUpdateData) {
     try {
       const updatedProject = await projectService.update(id, data)
-      const index = projects.value.findIndex(p => p.id === id)
-      if (index !== -1) {
-        projects.value[index] = updatedProject
-      }
+      // 使用数组替换，确保触发响应式更新
+      projects.value = projects.value.map(p => p.id === id ? updatedProject : p)
       return updatedProject
     } catch (e: any) {
       error.value = e.message

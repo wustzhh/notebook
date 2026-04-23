@@ -104,6 +104,58 @@ function getDatabase() {
     }
     return db;
 }
+// 序列化值，确保可通过 Electron IPC 克隆
+function serializeValue(value) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return value;
+    }
+    if (value instanceof Uint8Array) {
+        // 转换为普通数组
+        const arr = [];
+        for (let i = 0; i < value.length; i++) {
+            arr.push(value[i]);
+        }
+        return arr;
+    }
+    if (value instanceof ArrayBuffer) {
+        return { type: 'ArrayBuffer', byteLength: value.byteLength };
+    }
+    if (Array.isArray(value)) {
+        return value.map(v => serializeValue(v));
+    }
+    if (typeof value === 'object') {
+        // 处理 Date 对象
+        if (value instanceof Date) {
+            return value.toISOString();
+        }
+        // 处理其他对象，递归序列化
+        const result = {};
+        for (const key in value) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+                result[key] = serializeValue(value[key]);
+            }
+        }
+        return result;
+    }
+    // 其他类型（如函数）返回 null
+    return null;
+}
+// 序列化查询结果，确保可通过 Electron IPC 克隆
+function serializeResult(obj) {
+    if (obj === null || obj === undefined) {
+        return null;
+    }
+    const result = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            result[key] = serializeValue(obj[key]);
+        }
+    }
+    return result;
+}
 // 将查询结果转换为对象数组
 function queryToObjects(stmt) {
     const columns = stmt.getColumnNames();
@@ -132,7 +184,8 @@ function queryAll(sql, params = []) {
         columns.forEach((col, idx) => {
             obj[col] = row[idx];
         });
-        results.push(obj);
+        // 序列化结果，确保可通过 Electron IPC 克隆
+        results.push(serializeResult(obj));
     }
     stmt.free();
     return results;
@@ -140,17 +193,20 @@ function queryAll(sql, params = []) {
 // 辅助函数：执行单行查询
 function queryOne(sql, params = []) {
     const results = queryAll(sql, params);
+    // results 已经是序列化过的
     return results.length > 0 ? results[0] : null;
 }
 // 辅助函数：执行插入/更新/删除
 function execute(sql, params = []) {
     const database = getDatabase();
     database.run(sql, params);
-    saveDatabase();
-    // 如果是 INSERT，返回最后插入的 ID
+    // 如果是 INSERT，立即获取 ID（在 saveDatabase 之前）
     if (sql.trim().toUpperCase().startsWith('INSERT')) {
-        const result = queryOne('SELECT last_insert_rowid() as id');
-        return result?.id || 0;
+        const result = database.exec('SELECT last_insert_rowid() as id');
+        const id = result[0]?.values[0]?.[0] || 0;
+        saveDatabase();
+        return id;
     }
+    saveDatabase();
     return 0;
 }

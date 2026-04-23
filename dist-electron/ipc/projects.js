@@ -39,6 +39,10 @@ function registerProjectHandlers(mainWindow) {
                 projectData.description || ''
             ]);
             const newProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
+            // 检查返回值是否有效
+            if (!newProject) {
+                throw new Error('创建项目后查询失败');
+            }
             // 通知渲染进程
             mainWindow.webContents.send('project-created', newProject);
             return newProject;
@@ -70,6 +74,10 @@ function registerProjectHandlers(mainWindow) {
             values.push(id);
             (0, database_js_1.execute)(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);
             const updatedProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
+            // 检查返回值是否有效
+            if (!updatedProject) {
+                throw new Error('更新项目后查询失败');
+            }
             // 通知渲染进程
             mainWindow.webContents.send('project-updated', updatedProject);
             return updatedProject;

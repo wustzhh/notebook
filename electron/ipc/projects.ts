@@ -43,6 +43,11 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
 
       const newProject = queryOne('SELECT * FROM projects WHERE id = ?', [id])
 
+      // 检查返回值是否有效
+      if (!newProject) {
+        throw new Error('创建项目后查询失败')
+      }
+
       // 通知渲染进程
       mainWindow.webContents.send('project-created', newProject)
 
@@ -83,6 +88,11 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
       )
 
       const updatedProject = queryOne('SELECT * FROM projects WHERE id = ?', [id])
+
+      // 检查返回值是否有效
+      if (!updatedProject) {
+        throw new Error('更新项目后查询失败')
+      }
 
       // 通知渲染进程
       mainWindow.webContents.send('project-updated', updatedProject)

@@ -58,6 +58,10 @@ function registerTaskHandlers(mainWindow) {
                 newPosition
             ]);
             const newTask = (0, database_js_1.queryOne)('SELECT * FROM tasks WHERE id = ?', [id]);
+            // 检查返回值是否有效
+            if (!newTask) {
+                throw new Error('创建任务后查询失败');
+            }
             // 通知渲染进程
             mainWindow.webContents.send('task-created', newTask);
             return newTask;
@@ -105,6 +109,10 @@ function registerTaskHandlers(mainWindow) {
             values.push(id);
             (0, database_js_1.execute)(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`, values);
             const updatedTask = (0, database_js_1.queryOne)('SELECT * FROM tasks WHERE id = ?', [id]);
+            // 检查返回值是否有效
+            if (!updatedTask) {
+                throw new Error('更新任务后查询失败');
+            }
             // 通知渲染进程
             mainWindow.webContents.send('task-updated', updatedTask);
             return updatedTask;

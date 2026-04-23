@@ -66,6 +66,11 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
 
       const newTask = queryOne('SELECT * FROM tasks WHERE id = ?', [id])
 
+      // 检查返回值是否有效
+      if (!newTask) {
+        throw new Error('创建任务后查询失败')
+      }
+
       // 通知渲染进程
       mainWindow.webContents.send('task-created', newTask)
 
@@ -122,6 +127,11 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
       )
 
       const updatedTask = queryOne('SELECT * FROM tasks WHERE id = ?', [id])
+
+      // 检查返回值是否有效
+      if (!updatedTask) {
+        throw new Error('更新任务后查询失败')
+      }
 
       // 通知渲染进程
       mainWindow.webContents.send('task-updated', updatedTask)

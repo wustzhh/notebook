@@ -108,7 +108,13 @@ async function handleSubmit() {
 
     submitting.value = true
     try {
-      await projectStore.createProject(formData.value)
+      // 解构为纯对象，去除 Vue 响应式代理，确保可通过 IPC 序列化
+      await projectStore.createProject({
+        name: formData.value.name,
+        key: formData.value.key,
+        color: formData.value.color,
+        description: formData.value.description
+      })
       ElMessage.success('项目创建成功')
       handleClose()
     } catch (error: any) {

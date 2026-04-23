@@ -16,15 +16,24 @@ export const useTaskStore = defineStore('tasks', () => {
     tasks.value.find(t => t.id === selectedTaskId.value)
   )
 
+  // 辅助函数：过滤 null/undefined 值
+  function isValidTask(task: Task | null | undefined): task is Task {
+    return task !== null && task !== undefined
+  }
+
   // 按当前项目过滤的任务
   const projectStore = useProjectStore()
   const currentProjectTasks = computed(() => {
-    return tasks.value.filter(t => t.project_id === projectStore.currentProjectId)
+    return tasks.value
+      .filter(isValidTask)
+      .filter(t => t.project_id === projectStore.currentProjectId)
   })
 
   // 只获取父任务（排除子任务，用于看板和列表视图）
   const parentTasks = computed(() => {
-    return currentProjectTasks.value.filter(t => t.parent_id === null)
+    return currentProjectTasks.value
+      .filter(isValidTask)
+      .filter(t => t.parent_id === null)
   })
 
   // 按状态分组（基于当前项目的父任务，子任务不显示在看板列中）
@@ -37,7 +46,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
 
     parentTasks.value.forEach(task => {
-      if (grouped[task.status]) {
+      if (task && grouped[task.status]) {
         grouped[task.status].push(task)
       }
     })
@@ -75,7 +84,12 @@ export const useTaskStore = defineStore('tasks', () => {
   async function createTask(data: TaskCreateData) {
     try {
       const newTask = await taskService.create(data)
-      tasks.value.push(newTask)
+      // 检查返回值是否有效
+      if (!newTask) {
+        throw new Error('创建任务失败：返回空值')
+      }
+      // 使用数组替换而非 push，确保触发响应式更新
+      tasks.value = [...tasks.value, newTask]
       return newTask
     } catch (e: any) {
       error.value = e.message
@@ -87,10 +101,8 @@ export const useTaskStore = defineStore('tasks', () => {
   async function updateTask(id: number, data: TaskUpdateData) {
     try {
       const updatedTask = await taskService.update(id, data)
-      const index = tasks.value.findIndex(t => t.id === id)
-      if (index !== -1) {
-        tasks.value[index] = updatedTask
-      }
+      // 使用数组替换，确保触发响应式更新
+      tasks.value = tasks.value.map(t => t.id === id ? updatedTask : t)
       return updatedTask
     } catch (e: any) {
       error.value = e.message
@@ -272,7 +284,12 @@ export const useTaskStore = defineStore('tasks', () => {
         priority: data.priority || 'medium',
         position
       })
-      tasks.value.push(newTask)
+      // 检查返回值是否有效
+      if (!newTask) {
+        throw new Error('创建子任务失败：返回空值')
+      }
+      // 使用数组替换而非 push，确保触发响应式更新
+      tasks.value = [...tasks.value, newTask]
       return newTask
     } catch (e: any) {
       error.value = e.message
@@ -286,10 +303,8 @@ export const useTaskStore = defineStore('tasks', () => {
     try {
       const newStatus: TaskStatus = done ? 'done' : 'todo'
       const updatedTask = await taskService.update(subtaskId, { status: newStatus })
-      const index = tasks.value.findIndex(t => t.id === subtaskId)
-      if (index !== -1) {
-        tasks.value[index] = updatedTask
-      }
+      // 使用数组替换，确保触发响应式更新
+      tasks.value = tasks.value.map(t => t.id === subtaskId ? updatedTask : t)
       return updatedTask
     } catch (e: any) {
       error.value = e.message
