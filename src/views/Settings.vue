@@ -12,39 +12,12 @@
         <el-descriptions-item label="版本">1.0.0</el-descriptions-item>
         <el-descriptions-item label="技术栈">Electron + Vue 3 + Element Plus</el-descriptions-item>
       </el-descriptions>
-
-      <el-divider />
-
-      <div class="section">
-        <h3>数据管理</h3>
-        <el-button type="warning" @click="clearAllData">
-          清除所有数据
-        </el-button>
-        <p class="hint">注意：此操作将删除所有任务和项目，不可恢复！</p>
-      </div>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ElMessageBox } from 'element-plus'
-
-function clearAllData() {
-  ElMessageBox.confirm(
-    '确定要清除所有数据吗？此操作不可恢复！',
-    '警告',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    // TODO: 实现清除数据逻辑
-    console.log('Clear all data')
-  }).catch(() => {
-    // 用户取消
-  })
-}
+// 清除数据功能已移除
 </script>
 
 <style scoped>

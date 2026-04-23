@@ -49,15 +49,15 @@
           class="nav-menu"
           router
         >
-          <el-menu-item index="/board">
+          <el-menu-item index="/board" @click="uiStore.closeTaskDetail()">
             <el-icon><Grid /></el-icon>
             <span v-if="!uiStore.sidebarCollapsed">看板</span>
           </el-menu-item>
-          <el-menu-item index="/list">
+          <el-menu-item index="/list" @click="uiStore.closeTaskDetail()">
             <el-icon><List /></el-icon>
             <span v-if="!uiStore.sidebarCollapsed">列表</span>
           </el-menu-item>
-          <el-menu-item index="/settings">
+          <el-menu-item index="/settings" @click="uiStore.closeTaskDetail()">
             <el-icon><Setting /></el-icon>
             <span v-if="!uiStore.sidebarCollapsed">设置</span>
           </el-menu-item>
@@ -94,6 +94,7 @@ const activeRoute = computed(() => route.path)
 
 function handleProjectClick(projectId: number) {
   projectStore.setCurrentProject(projectId)
+  uiStore.closeTaskDetail()
 }
 </script>
 
