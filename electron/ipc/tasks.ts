@@ -64,7 +64,12 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
         ]
       )
 
-      const newTask = queryOne('SELECT * FROM tasks WHERE id = ?', [id])
+      const newTask = queryOne(`
+        SELECT t.*, p.name as project_name, p.key as project_key
+        FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        WHERE t.id = ?
+      `, [id])
 
       // 检查返回值是否有效
       if (!newTask) {
@@ -126,7 +131,12 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
         values
       )
 
-      const updatedTask = queryOne('SELECT * FROM tasks WHERE id = ?', [id])
+      const updatedTask = queryOne(`
+        SELECT t.*, p.name as project_name, p.key as project_key
+        FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        WHERE t.id = ?
+      `, [id])
 
       // 检查返回值是否有效
       if (!updatedTask) {
