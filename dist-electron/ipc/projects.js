@@ -70,6 +70,10 @@ function registerProjectHandlers(mainWindow) {
                 fields.push('description = ?');
                 values.push(data.description);
             }
+            if (data.status !== undefined) {
+                fields.push('status = ?');
+                values.push(data.status);
+            }
             fields.push('updated_at = CURRENT_TIMESTAMP');
             values.push(id);
             (0, database_js_1.execute)(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);

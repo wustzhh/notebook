@@ -34,7 +34,7 @@ function loadFromStorage(): StoredData {
       { id: 5, title: '测试和部署', description: '进行单元测试并部署应用', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'todo', priority: 'low', start_date: null, end_date: null, position: 4, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
     ],
     projects: [
-      { id: 1, name: 'Default Project', key: 'DEF', color: '#4A90D9', description: '默认项目', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+      { id: 1, name: 'Default Project', key: 'DEF', color: '#4A90D9', description: '默认项目', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
     ],
     nextTaskId: 6,
     nextProjectId: 2
@@ -146,6 +146,7 @@ const mockProjectAPI = {
     const newProject = {
       id: nextProjectId++,
       ...data,
+      status: 'active',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }

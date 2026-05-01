@@ -36,3 +36,4 @@ build/
 # 日志
 *.log
 node_modules
+/release

@@ -45,10 +45,18 @@ function createTables() {
       key TEXT NOT NULL UNIQUE,
       color TEXT DEFAULT '#4A90D9',
       description TEXT DEFAULT '',
+      status TEXT DEFAULT 'active',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+    // 兼容旧数据库：添加 status 列（如果不存在）
+    try {
+        db.run("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'active'");
+    }
+    catch (e) {
+        // 列已存在，忽略错误
+    }
     db.run(`
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

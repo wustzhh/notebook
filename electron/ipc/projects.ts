@@ -78,6 +78,10 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
         fields.push('description = ?')
         values.push(data.description)
       }
+      if (data.status !== undefined) {
+        fields.push('status = ?')
+        values.push(data.status)
+      }
 
       fields.push('updated_at = CURRENT_TIMESTAMP')
       values.push(id)

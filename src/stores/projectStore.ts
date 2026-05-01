@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { projectService } from '@/services/projectService'
-import type { Project, ProjectCreateData, ProjectUpdateData } from '@/types/project'
+import type { Project, ProjectStatus, ProjectCreateData, ProjectUpdateData } from '@/types/project'
 
 export const useProjectStore = defineStore('projects', () => {
   // State
@@ -13,6 +13,14 @@ export const useProjectStore = defineStore('projects', () => {
   // Getters
   const currentProject = computed(() =>
     projects.value.find(p => p.id === currentProjectId.value)
+  )
+
+  const activeProjects = computed(() =>
+    projects.value.filter(p => p.status !== 'completed')
+  )
+
+  const completedProjects = computed(() =>
+    projects.value.filter(p => p.status === 'completed')
   )
 
   // Actions
@@ -80,6 +88,13 @@ export const useProjectStore = defineStore('projects', () => {
     currentProjectId.value = projectId
   }
 
+  async function toggleProjectStatus(id: number) {
+    const project = projects.value.find(p => p.id === id)
+    if (!project) return
+    const newStatus: ProjectStatus = project.status === 'completed' ? 'active' : 'completed'
+    await updateProject(id, { status: newStatus })
+  }
+
   function clearError() {
     error.value = null
   }
@@ -88,6 +103,8 @@ export const useProjectStore = defineStore('projects', () => {
     projects,
     currentProjectId,
     currentProject,
+    activeProjects,
+    completedProjects,
     loading,
     error,
     loadProjects,
@@ -95,6 +112,7 @@ export const useProjectStore = defineStore('projects', () => {
     updateProject,
     deleteProject,
     setCurrentProject,
+    toggleProjectStatus,
     clearError
   }
 })
