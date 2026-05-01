@@ -16,7 +16,14 @@
     <div class="card-content" @click="handleClick">
       <div class="card-header">
         <span class="task-key">{{ task.project_key }}-{{ task.id }}</span>
-        <PriorityBadge :priority="task.priority" />
+        <span class="header-right">
+          <span v-if="cc > 0" class="comment-count">💬 {{ cc }}</span>
+          <PriorityBadge :priority="task.priority" />
+        </span>
+      </div>
+
+      <div v-if="cardTags.length > 0" class="card-tags">
+        <span v-for="tag in cardTags" :key="tag.id" class="card-tag" :style="{ background: tag.color + '22', color: tag.color }">{{ tag.name }}</span>
       </div>
 
       <h3 class="card-title">{{ task.title }}</h3>
@@ -93,6 +100,8 @@ import dayjs from 'dayjs'
 import { Rank, Calendar, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useTaskStore } from '@/stores/taskStore'
+import { useTagStore } from '@/stores/tagStore'
+import { useLogStore } from '@/stores/logStore'
 import { useUIStore } from '@/stores/uiStore'
 import PriorityBadge from '@/components/common/PriorityBadge.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
@@ -109,6 +118,8 @@ const emit = defineEmits<{
 }>()
 
 const taskStore = useTaskStore()
+const tagStore = useTagStore()
+const logStore = useLogStore()
 const uiStore = useUIStore()
 
 const isDragging = ref(false)
@@ -130,6 +141,10 @@ const progress = computed(() => {
     percent: total > 0 ? Math.round((done / total) * 100) : 0 
   }
 })
+
+const cardTags = computed(() => tagStore.getTaskTags(props.task.id))
+
+const cc = computed(() => logStore.commentCount(props.task.id))
 
 // 所有子任务（按 position 排序）
 const allSubtasks = computed(() => 
@@ -253,6 +268,12 @@ function formatDate(date: string) {
   align-items: center;
   margin-bottom: 8px;
 }
+
+.header-right { display: flex; align-items: center; gap: 6px; }
+.comment-count { font-size: 11px; color: var(--text-tertiary); }
+
+.card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.card-tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; }
 
 .task-key {
   font-size: 11px;

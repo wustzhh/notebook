@@ -85,6 +85,40 @@ function createTables() {
     )
   `)
 
+  db.run(`
+    CREATE TABLE IF NOT EXISTS tags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      color TEXT DEFAULT '#409EFF',
+      project_id INTEGER NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS task_tags (
+      task_id INTEGER NOT NULL,
+      tag_id INTEGER NOT NULL,
+      PRIMARY KEY (task_id, tag_id),
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+      FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+    )
+  `)
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS task_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      field TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    )
+  `)
+
   // 创建索引以提升查询性能
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)')
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)')

@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useAuthStore } from './authStore'
 import { useProjectStore } from './projectStore'
 import { useTaskStore } from './taskStore'
-
-let dirtyWatchInstalled = false
+import { useTagStore } from './tagStore'
+import { useLogStore } from './logStore'
 
 export const useSyncStore = defineStore('sync', () => {
   const lastSyncTime = ref<string>(localStorage.getItem('sync_last_time') || '')
@@ -40,6 +40,8 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       const projectStore = useProjectStore()
       const taskStore = useTaskStore()
+      const tagStore = useTagStore()
+      const logStore = useLogStore()
 
       const dirtyProjects = projectStore.projects.filter(p => !p.sync_version || p.sync_version === 0)
       const dirtyTasks = taskStore.tasks.filter(t => !t.sync_version || t.sync_version === 0)
@@ -49,7 +51,32 @@ export const useSyncStore = defineStore('sync', () => {
         return true
       }
 
-      const result = await syncFetch(auth.serverUrl, auth.token, '/sync/push', 'POST', { projects: dirtyProjects, tasks: dirtyTasks })
+      // 收集标签和评论
+      const allTags = tagStore.tags
+      const taskTags: any[] = []
+      for (const taskId in logStore.logs) {
+        // 此处的 task_tags 从 tagStore 获取
+      }
+      const comments: any[] = []
+      for (const [tid, entryLogs] of Object.entries(logStore.logs)) {
+        for (const l of entryLogs) {
+          if (l.type === 'comment') comments.push(l)
+        }
+      }
+      const taskTagsData: { task_id: number; tag_id: number }[] = []
+      for (const [taskId, ttags] of Object.entries(tagStore.taskTags)) {
+        for (const t of ttags) {
+          taskTagsData.push({ task_id: Number(taskId), tag_id: t.id })
+        }
+      }
+
+      const result = await syncFetch(auth.serverUrl, auth.token, '/sync/push', 'POST', {
+        projects: dirtyProjects,
+        tasks: dirtyTasks,
+        tags: allTags,
+        task_tags: taskTagsData,
+        task_logs: comments
+      })
 
       if (result.projects) {
         for (const sp of result.projects) {
@@ -87,6 +114,8 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       const projectStore = useProjectStore()
       const taskStore = useTaskStore()
+      const tagStore = useTagStore()
+      const logStore = useLogStore()
 
       const since = lastSyncTime.value || '1970-01-01T00:00:00Z'
       const result = await syncFetch(auth.serverUrl, auth.token, `/sync/pull?since=${encodeURIComponent(since)}`, 'GET')
@@ -117,6 +146,36 @@ export const useSyncStore = defineStore('sync', () => {
         }
       }
 
+      if (result.tags && result.tags.length > 0) {
+        for (const t of result.tags) {
+          if (!tagStore.tags.find(tt => tt.id === t.id)) tagStore.tags.push(t)
+        }
+      }
+
+      if (result.task_tags && result.task_tags.length > 0) {
+        for (const tt of result.task_tags) {
+          if (!tagStore.taskTags[tt.task_id]) tagStore.taskTags[tt.task_id] = []
+          const tag = tagStore.tags.find(t => t.id === tt.tag_id)
+          if (tag && !tagStore.taskTags[tt.task_id].find(t => t.id === tt.tag_id)) {
+            tagStore.taskTags[tt.task_id].push(tag)
+          }
+        }
+      }
+
+      if (result.task_logs && result.task_logs.length > 0) {
+        for (const l of result.task_logs) {
+          if (!logStore.logs[l.task_id]) logStore.logs[l.task_id] = []
+          if (!logStore.logs[l.task_id].find(e => e.id === l.id)) {
+            logStore.logs[l.task_id].push(l)
+          }
+        }
+      }
+
+      // 刷新标签缓存
+      const newIds = taskStore.tasks.map(t => t.id)
+      for (const id of newIds) await tagStore.loadTaskTags(id)
+      dirtyCount.value = 0
+
       return true
     } catch (e: any) {
       lastError.value = e.message
@@ -135,6 +194,8 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       const projectStore = useProjectStore()
       const taskStore = useTaskStore()
+      const tagStore = useTagStore()
+      const logStore = useLogStore()
 
       const result = await syncFetch(auth.serverUrl, auth.token, '/sync/full', 'GET')
 
@@ -144,6 +205,26 @@ export const useSyncStore = defineStore('sync', () => {
 
       projectStore.projects = result.projects || []
       taskStore.tasks = result.tasks || []
+      tagStore.tags = result.tags || []
+
+      if (result.task_tags && result.task_tags.length > 0) {
+        for (const tt of result.task_tags) {
+          if (!tagStore.taskTags[tt.task_id]) tagStore.taskTags[tt.task_id] = []
+          const tag = tagStore.tags.find(t => t.id === tt.tag_id)
+          if (tag && !tagStore.taskTags[tt.task_id].find(t => t.id === tt.tag_id)) {
+            tagStore.taskTags[tt.task_id].push(tag)
+          }
+        }
+      }
+
+      if (result.task_logs && result.task_logs.length > 0) {
+        for (const l of result.task_logs) {
+          if (!logStore.logs[l.task_id]) logStore.logs[l.task_id] = []
+          if (!logStore.logs[l.task_id].find(e => e.id === l.id)) {
+            logStore.logs[l.task_id].push(l)
+          }
+        }
+      }
 
       return true
     } catch (e: any) {
@@ -163,11 +244,31 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       const projectStore = useProjectStore()
       const taskStore = useTaskStore()
+      const tagStore = useTagStore()
+      const logStore = useLogStore()
 
       const allProjects = projectStore.projects.map(p => ({ ...p, sync_version: 1 }))
       const allTasks = taskStore.tasks.map(t => ({ ...t, sync_version: 1 }))
+      const comments: any[] = []
+      for (const [tid, entryLogs] of Object.entries(logStore.logs)) {
+        for (const l of entryLogs) {
+          if (l.type === 'comment') comments.push(l)
+        }
+      }
+      const taskTagsData: { task_id: number; tag_id: number }[] = []
+      for (const [taskId, ttags] of Object.entries(tagStore.taskTags)) {
+        for (const t of ttags) {
+          taskTagsData.push({ task_id: Number(taskId), tag_id: t.id })
+        }
+      }
 
-      await syncFetch(auth.serverUrl, auth.token, '/sync/push', 'POST', { projects: allProjects, tasks: allTasks })
+      await syncFetch(auth.serverUrl, auth.token, '/sync/push', 'POST', {
+        projects: allProjects,
+        tasks: allTasks,
+        tags: tagStore.tags,
+        task_tags: taskTagsData,
+        task_logs: comments
+      })
       dirtyCount.value = 0
       return true
     } catch (e: any) {
@@ -228,25 +329,6 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  // 自动追踪数据变更
-  function installDirtyWatcher() {
-    if (dirtyWatchInstalled) return
-    dirtyWatchInstalled = true
-
-    const projectStore = useProjectStore()
-    const taskStore = useTaskStore()
-
-    watch(
-      () => [projectStore.projects, taskStore.tasks],
-      (_new, _old) => {
-        if (!isSyncing.value) {
-          dirtyCount.value++
-        }
-      },
-      { deep: true }
-    )
-  }
-
   return {
     lastSyncTime,
     isSyncing,
@@ -262,15 +344,6 @@ export const useSyncStore = defineStore('sync', () => {
     fullPushToServer,
     manualSync,
     startAutoSync,
-    stopAutoSync,
-    installDirtyWatcher
+    stopAutoSync
   }
 })
-
-// 自动安装 dirty watcher
-setTimeout(() => {
-  try {
-    const store = useSyncStore()
-    store.installDirtyWatcher()
-  } catch { /* store not ready yet */ }
-}, 500)

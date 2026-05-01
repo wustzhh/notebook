@@ -91,6 +91,31 @@
           </el-form-item>
         </el-col>
       </el-row>
+
+      <el-form-item label="标签">
+        <el-select
+          v-model="formData.tagIds"
+          multiple
+          filterable
+          allow-create
+          default-first-option
+          placeholder="输入标签名，回车新建"
+          style="width: 100%"
+          @remove-tag="handleRemoveTag"
+        >
+          <el-option
+            v-for="tag in tagStore.tags"
+            :key="tag.id"
+            :label="tag.name"
+            :value="tag.id"
+          >
+            <span class="tag-option">
+              <span class="tag-dot" :style="{ background: tag.color }"></span>
+              {{ tag.name }}
+            </span>
+          </el-option>
+        </el-select>
+      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -103,14 +128,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useTaskStore } from '@/stores/taskStore'
+import { useTagStore } from '@/stores/tagStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useProjectStore } from '@/stores/projectStore'
 
 const taskStore = useTaskStore()
+const tagStore = useTagStore()
 const uiStore = useUIStore()
 const projectStore = useProjectStore()
 
@@ -131,7 +158,8 @@ const formData = ref({
   status: 'todo',
   priority: 'medium',
   start_date: null as string | null,
-  end_date: null as string | null
+  end_date: null as string | null,
+  tagIds: [] as number[]
 })
 
 const rules: FormRules = {
@@ -154,25 +182,42 @@ function resetForm() {
     status: 'todo',
     priority: 'medium',
     start_date: null,
-    end_date: null
+    end_date: null,
+    tagIds: []
   }
   formRef.value?.clearValidate()
 }
 
-function handleClose() {
-  uiStore.closeCreateTaskDialog()
-  resetForm()
+function handleRemoveTag(tagId: number) {
+  // Remove tag from selection (handled by el-select internally)
 }
 
 async function handleSubmit() {
   if (!formRef.value) return
 
+  // 去重并收集标签
+  const uniqueTagIds = [...new Set(formData.value.tagIds)]
+  const resolvedTagIds: number[] = []
+  for (const id of uniqueTagIds) {
+    if (typeof id === 'string') {
+      // 检查是否已有同名标签
+      const existing = tagStore.tags.find(t => t.name === id)
+      if (existing) {
+        resolvedTagIds.push(existing.id)
+      } else {
+        const tag = await tagStore.createTag(id, '#409EFF')
+        if (tag) resolvedTagIds.push(tag.id)
+      }
+    } else {
+      resolvedTagIds.push(id)
+    }
+  }
+
   await formRef.value.validate(async (valid) => {
     if (!valid) return
-
     submitting.value = true
     try {
-      await taskStore.createTask({
+      const newTask = await taskStore.createTask({
         title: formData.value.title,
         description: formData.value.description || '',
         project_id: projectStore.currentProjectId,
@@ -182,6 +227,9 @@ async function handleSubmit() {
         start_date: formData.value.start_date,
         end_date: formData.value.end_date
       })
+      if (newTask && resolvedTagIds.length > 0) {
+        await tagStore.setTaskTags(newTask.id, resolvedTagIds)
+      }
       ElMessage.success('任务创建成功')
       handleClose()
     } catch (error: any) {
@@ -191,4 +239,15 @@ async function handleSubmit() {
     }
   })
 }
+
+function handleClose() {
+  uiStore.closeCreateTaskDialog()
+  resetForm()
+}
+
+watch(visible, (val) => {
+  if (val) {
+    tagStore.loadProjectTags(projectStore.currentProjectId)
+  }
+})
 </script>

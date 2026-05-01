@@ -19,6 +19,17 @@ export interface Task {
   updated_at: string
 }
 
+export interface TaskLog {
+  id: number
+  task_id: number
+  type: 'comment' | 'created' | 'status_change' | 'priority_change' | 'title_change' | 'parent_change' | 'subtask_done'
+  content: string
+  old_value: string | null
+  new_value: string | null
+  field: string | null
+  created_at: string
+}
+
 export interface TaskCreateData {
   title: string
   description?: string

@@ -3,6 +3,13 @@ import { ref, computed } from 'vue'
 import { projectService } from '@/services/projectService'
 import type { Project, ProjectStatus, ProjectCreateData, ProjectUpdateData } from '@/types/project'
 
+function markDirty() {
+  try {
+    const { useSyncStore } = require('./syncStore')
+    useSyncStore().incrementDirty()
+  } catch { /* store not available */ }
+}
+
 export const useProjectStore = defineStore('projects', () => {
   // State
   const projects = ref<Project[]>([])
@@ -49,6 +56,7 @@ export const useProjectStore = defineStore('projects', () => {
       }
       // 使用数组替换而非 push，确保触发响应式更新
       projects.value = [...projects.value, newProject]
+      markDirty()
       return newProject
     } catch (e: any) {
       error.value = e.message
@@ -62,6 +70,7 @@ export const useProjectStore = defineStore('projects', () => {
       const updatedProject = await projectService.update(id, data)
       // 使用数组替换，确保触发响应式更新
       projects.value = projects.value.map(p => p.id === id ? updatedProject : p)
+      markDirty()
       return updatedProject
     } catch (e: any) {
       error.value = e.message
@@ -77,6 +86,7 @@ export const useProjectStore = defineStore('projects', () => {
       if (currentProjectId.value === id) {
         currentProjectId.value = projects.value[0]?.id || 0
       }
+      markDirty()
     } catch (e: any) {
       error.value = e.message
       console.error('Failed to delete project:', e)

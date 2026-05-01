@@ -47,8 +47,39 @@ declare global {
     projectAPI: ProjectAPI
     authAPI: AuthAPI
     syncAPI: SyncAPI
+    tagAPI: TagAPI
+    logAPI: LogAPI
   }
 }
+
+interface TagAPI {
+  getByProject: (projectId: number) => Promise<any[]>
+  getForTask: (taskId: number) => Promise<any[]>
+  create: (data: any) => Promise<any>
+  delete: (id: number) => Promise<void>
+  setTaskTags: (taskId: number, tagIds: number[]) => Promise<void>
+}
+
+interface LogAPI {
+  getByTask: (taskId: number) => Promise<any[]>
+  create: (data: any) => Promise<void>
+}
+
+const tagAPI: TagAPI = {
+  getByProject: (projectId: number) => ipcRenderer.invoke('tags:get-by-project', projectId),
+  getForTask: (taskId: number) => ipcRenderer.invoke('tags:get-for-task', taskId),
+  create: (data: any) => ipcRenderer.invoke('tags:create', data),
+  delete: (id: number) => ipcRenderer.invoke('tags:delete', id),
+  setTaskTags: (taskId: number, tagIds: number[]) => ipcRenderer.invoke('tags:set-task-tags', taskId, tagIds)
+}
+
+const logAPI: LogAPI = {
+  getByTask: (taskId: number) => ipcRenderer.invoke('logs:get-by-task', taskId),
+  create: (data: any) => ipcRenderer.invoke('logs:create', data)
+}
+
+contextBridge.exposeInMainWorld('tagAPI', tagAPI)
+contextBridge.exposeInMainWorld('logAPI', logAPI)
 
 interface AuthAPI {
   saveToken: (token: string) => Promise<void>

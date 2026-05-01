@@ -51,6 +51,12 @@
                 <PriorityBadge :priority="row.priority" />
               </template>
             </el-table-column>
+            <el-table-column label="💬" width="60" align="center">
+              <template #default="{ row }">
+                <span v-if="getCommentCount(row.id)" class="list-comment-count">{{ getCommentCount(row.id) }}</span>
+                <span v-else class="list-comment-zero">-</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="end_date" label="截止日期" width="120">
               <template #default="{ row }">
                 {{ row.end_date ? formatDate(row.end_date) : '-' }}
@@ -70,6 +76,8 @@ import { computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import { useTaskStore } from '@/stores/taskStore'
 import { useProjectStore } from '@/stores/projectStore'
+import { useLogStore } from '@/stores/logStore'
+import { useTagStore } from '@/stores/tagStore'
 import { useUIStore } from '@/stores/uiStore'
 import KanbanBoard from '@/components/kanban/KanbanBoard.vue'
 import TaskDetailPanel from '@/components/TaskDetailPanel.vue'
@@ -79,6 +87,8 @@ import { Loading, Plus } from '@element-plus/icons-vue'
 
 const taskStore = useTaskStore()
 const projectStore = useProjectStore()
+const logStore = useLogStore()
+const tagStore = useTagStore()
 const uiStore = useUIStore()
 
 const filteredParentTasks = computed(() => {
@@ -124,8 +134,20 @@ function handleRowClick(row: any) {
   uiStore.openTaskDetail(row.id)
 }
 
+function getCommentCount(taskId: number) {
+  return logStore.commentCount(taskId)
+}
+
 onMounted(async () => {
   await taskStore.loadTasks()
+  await tagStore.loadProjectTags(projectStore.currentProjectId)
+  const ids = taskStore.tasks.map(t => t.id)
+  if (ids.length > 0) {
+    await logStore.loadCommentCounts(ids)
+    for (const id of ids) {
+      await tagStore.loadTaskTags(id)
+    }
+  }
 })
 </script>
 
@@ -223,4 +245,6 @@ onMounted(async () => {
   --el-table-header-text-color: var(--text-secondary);
   --el-table-row-hover-bg-color: var(--bg-hover);
 }
+.list-comment-count { color: var(--text-secondary); font-size: 13px; }
+.list-comment-zero { color: var(--text-tertiary); }
 </style>

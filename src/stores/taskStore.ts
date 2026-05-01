@@ -3,6 +3,20 @@ import { ref, computed } from 'vue'
 import { taskService } from '@/services/taskService'
 import { useProjectStore } from './projectStore'
 import type { Task, TaskStatus, TaskCreateData, TaskUpdateData } from '@/types/task'
+import { useLogStore } from './logStore'
+
+async function markDirty() {
+  try {
+    const { useSyncStore } = require('./syncStore')
+    useSyncStore().incrementDirty()
+  } catch { /* store not available */ }
+}
+
+async function logChange(taskId: number, data: any) {
+  try {
+    await window.logAPI.create(data)
+  } catch { /* electron not available */ }
+}
 
 export const useTaskStore = defineStore('tasks', () => {
   // State
@@ -88,8 +102,9 @@ export const useTaskStore = defineStore('tasks', () => {
       if (!newTask) {
         throw new Error('创建任务失败：返回空值')
       }
-      // 使用数组替换而非 push，确保触发响应式更新
       tasks.value = [...tasks.value, newTask]
+      logChange(newTask.id, { task_id: newTask.id, type: 'created', content: '创建了任务' })
+      markDirty()
       return newTask
     } catch (e: any) {
       error.value = e.message
@@ -100,9 +115,28 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function updateTask(id: number, data: TaskUpdateData) {
     try {
+      const oldTask = tasks.value.find(t => t.id === id)
       const updatedTask = await taskService.update(id, data)
-      // 使用数组替换，确保触发响应式更新
       tasks.value = tasks.value.map(t => t.id === id ? updatedTask : t)
+
+      // 自动记录变更日志
+      if (oldTask) {
+        if (data.title !== undefined && data.title !== oldTask.title) {
+          logChange(id, { task_id: id, type: 'title_change', content: `标题改为「${data.title}」`, old_value: oldTask.title, new_value: data.title, field: 'title' })
+        }
+        if (data.status !== undefined && data.status !== oldTask.status) {
+          const label: Record<string, string> = { todo: '待办', in_progress: '进行中', review: '审核中', done: '已完成' }
+          logChange(id, { task_id: id, type: 'status_change', content: `状态从 ${label[oldTask.status]} 变为 ${label[data.status]}`, old_value: oldTask.status, new_value: data.status, field: 'status' })
+        }
+        if (data.priority !== undefined && data.priority !== oldTask.priority) {
+          const label: Record<string, string> = { low: '低', medium: '中', high: '高', critical: '紧急' }
+          logChange(id, { task_id: id, type: 'priority_change', content: `优先级从 ${label[oldTask.priority]} 变为 ${label[data.priority]}`, old_value: oldTask.priority, new_value: data.priority, field: 'priority' })
+        }
+        if (data.parent_id !== undefined && data.parent_id !== oldTask.parent_id) {
+          logChange(id, { task_id: id, type: 'parent_change', content: data.parent_id ? '设为子任务' : '取消子任务', old_value: String(oldTask.parent_id || ''), new_value: String(data.parent_id || ''), field: 'parent_id' })
+        }
+      }
+      markDirty()
       return updatedTask
     } catch (e: any) {
       error.value = e.message
@@ -115,6 +149,7 @@ export const useTaskStore = defineStore('tasks', () => {
     try {
       await taskService.delete(id)
       tasks.value = tasks.value.filter(t => t.id !== id)
+      markDirty()
       if (selectedTaskId.value === id) {
         selectedTaskId.value = null
       }
@@ -148,6 +183,7 @@ export const useTaskStore = defineStore('tasks', () => {
 
       // 后台同步到数据库
       await taskService.reorder(updates)
+      markDirty()
     } catch (e: any) {
       error.value = e.message
       console.error('Failed to reorder tasks:', e)
@@ -290,6 +326,7 @@ export const useTaskStore = defineStore('tasks', () => {
       }
       // 使用数组替换而非 push，确保触发响应式更新
       tasks.value = [...tasks.value, newTask]
+      markDirty()
       return newTask
     } catch (e: any) {
       error.value = e.message
@@ -305,6 +342,7 @@ export const useTaskStore = defineStore('tasks', () => {
       const updatedTask = await taskService.update(subtaskId, { status: newStatus })
       // 使用数组替换，确保触发响应式更新
       tasks.value = tasks.value.map(t => t.id === subtaskId ? updatedTask : t)
+      markDirty()
       return updatedTask
     } catch (e: any) {
       error.value = e.message

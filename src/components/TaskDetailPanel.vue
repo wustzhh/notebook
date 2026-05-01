@@ -1,11 +1,14 @@
 <template>
   <div v-if="task" class="task-detail-panel">
     <div class="panel-header">
-      <h3>任务详情</h3>
+      <div class="panel-tabs">
+        <button class="tab-btn" :class="{ active: activeTab === 'detail' }" @click="activeTab = 'detail'">详情</button>
+        <button class="tab-btn" :class="{ active: activeTab === 'activity' }" @click="activeTab = 'activity'; loadLogs()">活动 <span v-if="logCount" class="tab-badge">{{ logCount }}</span></button>
+      </div>
       <el-button text :icon="Close" @click="handleClose" />
     </div>
 
-    <div class="panel-body">
+    <div class="panel-body" v-if="activeTab === 'detail'">
       <!-- ID (只读) -->
       <div class="field-group">
         <label>ID</label>
@@ -65,6 +68,19 @@
         <span v-else class="clickable" @click="startEdit('priority')">
           <PriorityBadge :priority="task.priority" />
         </span>
+      </div>
+
+      <!-- 标签 (可编辑) -->
+      <div v-if="!isSubtask" class="field-group">
+        <label>标签</label>
+        <div class="tags-row">
+          <span v-for="tag in taskTags" :key="tag.id" class="tag-chip" :style="{ background: tag.color + '22', color: tag.color, borderColor: tag.color + '55' }">
+            {{ tag.name }}<el-icon class="tag-remove" @click.stop="removeTagFromTask(tag.id)"><Close /></el-icon>
+          </span>
+          <el-select v-model="newTagIds" multiple filterable allow-create default-first-option placeholder="+ 标签" size="small" class="inline-tag-picker" @change="handleAddTag" @remove-tag="handleRemoveTaskTag">
+            <el-option v-for="t in availableTags" :key="t.id" :label="t.name" :value="t.id" />
+          </el-select>
+        </div>
       </div>
 
       <!-- 开始日期 (可编辑) - 仅父任务显示 -->
@@ -188,7 +204,25 @@
       </div>
     </div>
 
-    <div class="panel-footer">
+    <!-- 活动日志 tab -->
+    <div class="panel-body" v-if="activeTab === 'activity'">
+      <div v-if="taskLogs.length === 0 && !logLoading" class="empty-logs">暂无活动记录</div>
+      <div v-if="logLoading" class="empty-logs">加载中...</div>
+      <div v-for="log in taskLogs" :key="log.id" class="log-item">
+        <span class="log-time">{{ formatLogTime(log.created_at) }}</span>
+        <span class="log-content">{{ log.content }}</span>
+        <span v-if="log.type === 'comment'" class="log-type-badge comment">评论</span>
+      </div>
+      <div class="comment-box">
+        <el-input v-model="commentText" placeholder="添加评论..." size="small" @keyup.enter="sendComment">
+          <template #suffix>
+            <el-button text size="small" @click="sendComment">发送</el-button>
+          </template>
+        </el-input>
+      </div>
+    </div>
+
+    <div class="panel-footer" v-if="activeTab === 'detail'">
       <el-popconfirm title="确定删除此任务？" @confirm="handleDelete">
         <template #reference>
           <el-button type="danger">删除</el-button>
@@ -205,17 +239,23 @@ import { Close, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUIStore } from '@/stores/uiStore'
 import { useTaskStore } from '@/stores/taskStore'
+import { useTagStore } from '@/stores/tagStore'
+import { useLogStore } from '@/stores/logStore'
 import StatusTag from '@/components/common/StatusTag.vue'
 import PriorityBadge from '@/components/common/PriorityBadge.vue'
 import type { Task } from '@/types/task'
 
 const uiStore = useUIStore()
 const taskStore = useTaskStore()
+const tagStore = useTagStore()
+const logStore = useLogStore()
 
 const task = computed(() => uiStore.viewingTask)
-
-// 判断是否是子任务
 const isSubtask = computed(() => task.value?.parent_id !== null)
+const activeTab = ref<'detail' | 'activity'>('detail')
+const commentText = ref('')
+const logLoading = ref(false)
+const newTagIds = ref<number[]>([])
 
 // 直接访问 taskStore.tasks 以确保响应式追踪
 const subtasks = computed(() => {
@@ -241,6 +281,62 @@ const subtaskProgressColor = computed(() => {
   return '#909399'
 })
 
+// 标签
+const taskTags = computed(() => task.value ? tagStore.getTaskTags(task.value.id) : [])
+const availableTags = computed(() => {
+  if (!task.value) return tagStore.tags
+  const used = taskTags.value.map(t => t.id)
+  return tagStore.tags.filter(t => !used.includes(t.id))
+})
+const logCount = computed(() => task.value ? (logStore.logs[task.value.id]?.length || 0) : 0)
+const taskLogs = computed(() => task.value ? logStore.getTaskLogs(task.value.id) : [])
+
+async function loadLogs() {
+  if (!task.value) return
+  logLoading.value = true
+  await logStore.loadTaskLogs(task.value.id)
+  logLoading.value = false
+}
+
+async function sendComment() {
+  if (!task.value || !commentText.value.trim()) return
+  await logStore.appendLog(task.value.id, { task_id: task.value.id, type: 'comment', content: commentText.value.trim() })
+  try { const { useSyncStore } = require('@/stores/syncStore') || await import('@/stores/syncStore'); useSyncStore().incrementDirty() } catch {}
+  commentText.value = ''
+}
+
+function formatLogTime(iso: string) {
+  if (!iso) return ''
+  return dayjs(iso).format('MM-DD HH:mm')
+}
+
+async function handleAddTag(values: (number | string)[]) {
+  if (!task.value) return
+  const ids: number[] = []
+  for (const v of values) {
+    if (typeof v === 'string') {
+      const tag = await tagStore.createTag(v, '#409EFF')
+      if (tag) ids.push(tag.id)
+    } else {
+      ids.push(v)
+    }
+  }
+  // 去重
+  const unique = [...new Set(ids)]
+  await tagStore.setTaskTags(task.value.id, unique)
+  newTagIds.value = []
+}
+
+function handleRemoveTaskTag(tagId: number) {
+  if (!task.value) return
+  const currentIds = taskTags.value.map(t => t.id).filter(id => id !== tagId)
+  tagStore.setTaskTags(task.value.id, currentIds)
+}
+
+async function removeTagFromTask(tagId: number) {
+  handleRemoveTaskTag(tagId)
+}
+
 const editingField = ref<string | null>(null)
 const editForm = ref<Partial<Task>>({})
 
@@ -257,6 +353,11 @@ watch(task, () => {
   editForm.value = {}
   showAddSubtask.value = false
   newSubtaskTitle.value = ''
+  activeTab.value = 'detail'
+  commentText.value = ''
+  if (task.value) {
+    tagStore.loadTaskTags(task.value.id)
+  }
 })
 
 // 监听显示添加子任务，自动聚焦
@@ -581,4 +682,36 @@ function openParentTask() {
   justify-content: flex-end;
   transition: border-color 0.3s ease;
 }
+
+.panel-tabs { display: flex; gap: 4px; }
+.tab-btn {
+  background: none; border: none; color: var(--text-secondary);
+  padding: 6px 12px; font-size: 13px; cursor: pointer;
+  border-radius: 6px; transition: all 0.15s;
+}
+.tab-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.tab-btn.active { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; }
+.tab-badge { font-size: 10px; background: var(--bg-hover); padding: 1px 5px; border-radius: 8px; margin-left: 4px; }
+
+.tags-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 4px; font-size: 12px;
+  border: 1px solid;
+}
+.tag-remove { font-size: 10px; cursor: pointer; opacity: 0.6; }
+.tag-remove:hover { opacity: 1; }
+
+.inline-tag-picker { width: 100px; }
+.inline-tag-picker :deep(.el-select__tags) { flex-wrap: nowrap; }
+
+.empty-logs { text-align: center; color: var(--text-tertiary); padding: 40px 0; font-size: 13px; }
+.log-item {
+  padding: 10px 0; border-bottom: 1px solid var(--border-color);
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+}
+.log-time { font-size: 11px; color: var(--text-tertiary); min-width: 70px; }
+.log-content { flex: 1; font-size: 13px; color: var(--text-primary); }
+.log-type-badge.comment { font-size: 10px; background: #409eff22; color: #409eff; padding: 1px 6px; border-radius: 8px; }
+.comment-box { margin-top: 12px; }
 </style>

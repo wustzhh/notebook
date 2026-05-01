@@ -20,6 +20,19 @@ const projectAPI = {
 // 暴露到 window 对象
 electron_1.contextBridge.exposeInMainWorld('taskAPI', taskAPI);
 electron_1.contextBridge.exposeInMainWorld('projectAPI', projectAPI);
+const tagAPI = {
+    getByProject: (projectId) => electron_1.ipcRenderer.invoke('tags:get-by-project', projectId),
+    getForTask: (taskId) => electron_1.ipcRenderer.invoke('tags:get-for-task', taskId),
+    create: (data) => electron_1.ipcRenderer.invoke('tags:create', data),
+    delete: (id) => electron_1.ipcRenderer.invoke('tags:delete', id),
+    setTaskTags: (taskId, tagIds) => electron_1.ipcRenderer.invoke('tags:set-task-tags', taskId, tagIds)
+};
+const logAPI = {
+    getByTask: (taskId) => electron_1.ipcRenderer.invoke('logs:get-by-task', taskId),
+    create: (data) => electron_1.ipcRenderer.invoke('logs:create', data)
+};
+electron_1.contextBridge.exposeInMainWorld('tagAPI', tagAPI);
+electron_1.contextBridge.exposeInMainWorld('logAPI', logAPI);
 const authAPI = {
     saveToken: (token) => electron_1.ipcRenderer.invoke('auth:save-token', token),
     getToken: () => electron_1.ipcRenderer.invoke('auth:get-token'),
