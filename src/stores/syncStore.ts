@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from './authStore'
 import { useProjectStore } from './projectStore'
 import { useTaskStore } from './taskStore'
+
+let dirtyWatchInstalled = false
 
 export const useSyncStore = defineStore('sync', () => {
   const lastSyncTime = ref<string>(localStorage.getItem('sync_last_time') || '')
@@ -226,6 +228,25 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  // 自动追踪数据变更
+  function installDirtyWatcher() {
+    if (dirtyWatchInstalled) return
+    dirtyWatchInstalled = true
+
+    const projectStore = useProjectStore()
+    const taskStore = useTaskStore()
+
+    watch(
+      () => [projectStore.projects, taskStore.tasks],
+      (_new, _old) => {
+        if (!isSyncing.value) {
+          dirtyCount.value++
+        }
+      },
+      { deep: true }
+    )
+  }
+
   return {
     lastSyncTime,
     isSyncing,
@@ -241,6 +262,15 @@ export const useSyncStore = defineStore('sync', () => {
     fullPushToServer,
     manualSync,
     startAutoSync,
-    stopAutoSync
+    stopAutoSync,
+    installDirtyWatcher
   }
 })
+
+// 自动安装 dirty watcher
+setTimeout(() => {
+  try {
+    const store = useSyncStore()
+    store.installDirtyWatcher()
+  } catch { /* store not ready yet */ }
+}, 500)

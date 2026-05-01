@@ -7,6 +7,7 @@ export const useUIStore = defineStore('ui', () => {
 
   // State
   const sidebarCollapsed = ref(false)
+  const viewMode = ref<'board' | 'list'>((localStorage.getItem('view_mode') as 'board' | 'list') || 'board')
   const showCreateTaskDialog = ref(false)
   const showCreateProjectDialog = ref(false)
   const selectedTaskId = ref<number | null>(null)
@@ -23,6 +24,11 @@ export const useUIStore = defineStore('ui', () => {
   // Actions
   function toggleSidebar() {
     sidebarCollapsed.value = !sidebarCollapsed.value
+  }
+
+  function setViewMode(mode: 'board' | 'list') {
+    viewMode.value = mode
+    localStorage.setItem('view_mode', mode)
   }
 
   function openCreateTaskDialog() {
@@ -69,6 +75,7 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     sidebarCollapsed,
+    viewMode,
     showCreateTaskDialog,
     showCreateProjectDialog,
     selectedTaskId,
@@ -77,6 +84,7 @@ export const useUIStore = defineStore('ui', () => {
     filterStatus,
     filterPriority,
     toggleSidebar,
+    setViewMode,
     openCreateTaskDialog,
     closeCreateTaskDialog,
     openTaskDetail,

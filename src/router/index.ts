@@ -1,6 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import BoardView from '@/views/BoardView.vue'
-import ListView from '@/views/ListView.vue'
+import ProjectView from '@/views/ProjectView.vue'
 import Settings from '@/views/Settings.vue'
 
 const router = createRouter({
@@ -8,17 +7,8 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/board'
-    },
-    {
-      path: '/board',
-      name: 'Board',
-      component: BoardView
-    },
-    {
-      path: '/list',
-      name: 'List',
-      component: ListView
+      name: 'Project',
+      component: ProjectView
     },
     {
       path: '/settings',
