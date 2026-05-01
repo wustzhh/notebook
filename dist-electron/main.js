@@ -7,6 +7,8 @@ const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const tasks_js_1 = require("./ipc/tasks.js");
 const projects_js_1 = require("./ipc/projects.js");
+const auth_js_1 = require("./ipc/auth.js");
+const sync_js_1 = require("./ipc/sync.js");
 // __dirname 在 CommonJS 中全局可用，无需声明
 let mainWindow = null;
 function createWindow() {
@@ -46,6 +48,8 @@ electron_1.app.whenReady().then(() => {
     // 注册 IPC 处理器
     (0, tasks_js_1.registerTaskHandlers)(mainWindow);
     (0, projects_js_1.registerProjectHandlers)(mainWindow);
+    (0, auth_js_1.registerAuthHandlers)();
+    (0, sync_js_1.registerSyncHandlers)();
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {
             createWindow();

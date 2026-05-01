@@ -39,6 +39,7 @@ function createTables() {
       color TEXT DEFAULT '#4A90D9',
       description TEXT DEFAULT '',
       status TEXT DEFAULT 'active',
+      sync_version INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -47,6 +48,19 @@ function createTables() {
   // 兼容旧数据库：添加 status 列（如果不存在）
   try {
     db.run("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'active'")
+  } catch (e) {
+    // 列已存在，忽略错误
+  }
+
+  // 兼容旧数据库：添加 sync_version 列（如果不存在）
+  try {
+    db.run("ALTER TABLE projects ADD COLUMN sync_version INTEGER DEFAULT 0")
+  } catch (e) {
+    // 列已存在，忽略错误
+  }
+
+  try {
+    db.run("ALTER TABLE tasks ADD COLUMN sync_version INTEGER DEFAULT 0")
   } catch (e) {
     // 列已存在，忽略错误
   }
@@ -63,6 +77,7 @@ function createTables() {
       start_date TEXT,
       end_date TEXT,
       position INTEGER DEFAULT 0,
+      sync_version INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,

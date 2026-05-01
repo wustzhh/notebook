@@ -14,6 +14,7 @@ export interface Task {
   start_date: string | null
   end_date: string | null
   position: number
+  sync_version?: number
   created_at: string
   updated_at: string
 }

@@ -7,6 +7,7 @@ export interface Project {
   color: string
   description: string
   status: ProjectStatus
+  sync_version?: number
   created_at: string
   updated_at: string
 }

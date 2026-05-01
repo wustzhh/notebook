@@ -49,6 +49,8 @@
         新建任务
       </el-button>
 
+      <SyncStatus />
+
       <DarkModeToggle />
     </div>
   </div>
@@ -62,6 +64,7 @@ import { useThemeStore } from '@/stores/themeStore'
 import { useProjectStore } from '@/stores/projectStore'
 import { Plus } from '@element-plus/icons-vue'
 import DarkModeToggle from '@/components/common/DarkModeToggle.vue'
+import SyncStatus from '@/components/layout/SyncStatus.vue'
 
 const themeStore = useThemeStore()
 const projectStore = useProjectStore()

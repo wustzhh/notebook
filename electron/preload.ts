@@ -45,5 +45,44 @@ declare global {
   interface Window {
     taskAPI: TaskAPI
     projectAPI: ProjectAPI
+    authAPI: AuthAPI
+    syncAPI: SyncAPI
   }
 }
+
+interface AuthAPI {
+  saveToken: (token: string) => Promise<void>
+  getToken: () => Promise<string | null>
+  clearToken: () => Promise<void>
+  saveCredentials: (email: string, password: string) => Promise<void>
+  getCredentials: () => Promise<{ email: string; password: string } | null>
+}
+
+interface SyncAPI {
+  configure: (serverUrl: string, token: string) => Promise<void>
+  push: (serverUrl: string, token: string, data: any) => Promise<any>
+  pull: (serverUrl: string, token: string, since: string) => Promise<any>
+  full: (serverUrl: string, token: string) => Promise<any>
+  health: (serverUrl: string) => Promise<boolean>
+  getLastTime: () => Promise<string>
+}
+
+const authAPI: AuthAPI = {
+  saveToken: (token: string) => ipcRenderer.invoke('auth:save-token', token),
+  getToken: () => ipcRenderer.invoke('auth:get-token'),
+  clearToken: () => ipcRenderer.invoke('auth:clear-token'),
+  saveCredentials: (email: string, password: string) => ipcRenderer.invoke('auth:save-credentials', email, password),
+  getCredentials: () => ipcRenderer.invoke('auth:get-credentials')
+}
+
+const syncAPI: SyncAPI = {
+  configure: (serverUrl: string, token: string) => ipcRenderer.invoke('sync:configure', serverUrl, token),
+  push: (serverUrl: string, token: string, data: any) => ipcRenderer.invoke('sync:push', serverUrl, token, data),
+  pull: (serverUrl: string, token: string, since: string) => ipcRenderer.invoke('sync:pull', serverUrl, token, since),
+  full: (serverUrl: string, token: string) => ipcRenderer.invoke('sync:full', serverUrl, token),
+  health: (serverUrl: string) => ipcRenderer.invoke('sync:health', serverUrl),
+  getLastTime: () => ipcRenderer.invoke('sync:get-last-time')
+}
+
+contextBridge.exposeInMainWorld('authAPI', authAPI)
+contextBridge.exposeInMainWorld('syncAPI', syncAPI)

@@ -37,3 +37,6 @@ build/
 *.log
 node_modules
 /release
+/server/node_modules
+/server/.env
+/server/data

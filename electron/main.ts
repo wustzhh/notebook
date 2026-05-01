@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
 import { registerTaskHandlers } from './ipc/tasks.js'
 import { registerProjectHandlers } from './ipc/projects.js'
+import { registerAuthHandlers } from './ipc/auth.js'
+import { registerSyncHandlers } from './ipc/sync.js'
 
 // __dirname 在 CommonJS 中全局可用，无需声明
 
@@ -48,6 +50,8 @@ app.whenReady().then(() => {
   // 注册 IPC 处理器
   registerTaskHandlers(mainWindow!)
   registerProjectHandlers(mainWindow!)
+  registerAuthHandlers()
+  registerSyncHandlers()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

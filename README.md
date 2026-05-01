@@ -174,3 +174,57 @@ task-tracker/
 ## License
 
 MIT
+
+---
+
+## 远程同步（服务端部署）
+
+### 环境要求
+
+- Windows Server 2016+ 或 Windows 10/11
+- Node.js 18+
+
+### 部署步骤
+
+```powershell
+# 1. 将 server/ 目录复制到服务器，然后
+cd C:\workspace\server
+npm install
+
+# 2. 创建账号
+node cli.js add-user --email 邮箱 --password 密码
+
+# 3. 开放防火墙 TCP 3000 端口
+
+# 4. 启动服务
+npm install -g pm2
+pm2 start index.js --name tasktracker
+pm2 save
+```
+
+### 账号管理
+
+```powershell
+node cli.js add-user         --email xxx --password xxx    # 创建账号
+node cli.js list                                            # 列出所有用户
+node cli.js del-user         --email xxx                   # 删除用户及数据
+node cli.js reset-password   --email xxx --password xxx    # 重置密码
+```
+
+> 操作完账号后需执行 `pm2 restart tasktracker` 重启服务。
+
+### 服务管理
+
+```powershell
+pm2 status                  # 查看状态
+pm2 restart tasktracker     # 重启
+pm2 logs tasktracker        # 查看日志
+```
+
+### 数据迁移
+
+所有数据存储在 `server\data\app.db` 一个文件中，拷贝即可迁移。
+
+### 客户端连接
+
+设置页填入服务器地址 `http://IP:3000`，邮箱密码登录。

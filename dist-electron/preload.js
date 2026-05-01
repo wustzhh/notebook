@@ -20,3 +20,20 @@ const projectAPI = {
 // 暴露到 window 对象
 electron_1.contextBridge.exposeInMainWorld('taskAPI', taskAPI);
 electron_1.contextBridge.exposeInMainWorld('projectAPI', projectAPI);
+const authAPI = {
+    saveToken: (token) => electron_1.ipcRenderer.invoke('auth:save-token', token),
+    getToken: () => electron_1.ipcRenderer.invoke('auth:get-token'),
+    clearToken: () => electron_1.ipcRenderer.invoke('auth:clear-token'),
+    saveCredentials: (email, password) => electron_1.ipcRenderer.invoke('auth:save-credentials', email, password),
+    getCredentials: () => electron_1.ipcRenderer.invoke('auth:get-credentials')
+};
+const syncAPI = {
+    configure: (serverUrl, token) => electron_1.ipcRenderer.invoke('sync:configure', serverUrl, token),
+    push: (serverUrl, token, data) => electron_1.ipcRenderer.invoke('sync:push', serverUrl, token, data),
+    pull: (serverUrl, token, since) => electron_1.ipcRenderer.invoke('sync:pull', serverUrl, token, since),
+    full: (serverUrl, token) => electron_1.ipcRenderer.invoke('sync:full', serverUrl, token),
+    health: (serverUrl) => electron_1.ipcRenderer.invoke('sync:health', serverUrl),
+    getLastTime: () => electron_1.ipcRenderer.invoke('sync:get-last-time')
+};
+electron_1.contextBridge.exposeInMainWorld('authAPI', authAPI);
+electron_1.contextBridge.exposeInMainWorld('syncAPI', syncAPI);
