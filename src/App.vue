@@ -61,8 +61,8 @@ onMounted(async () => {
   --bg-hover: rgba(255, 255, 255, 0.1);
   --text-primary: #eaeaea;
   --text-secondary: #b8b8b8;
-  --text-tertiary: #888888;
-  --border-color: #2a2a4a;
+  --text-tertiary: #a0a0a0;
+  --border-color: #3a3a5a;
   --card-bg: #1f1f3a;
   --sidebar-bg: #0a0a1a;
   --sidebar-text: #eaeaea;
