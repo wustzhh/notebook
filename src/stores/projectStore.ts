@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { projectService } from '@/services/projectService'
 import type { Project, ProjectStatus, ProjectCreateData, ProjectUpdateData } from '@/types/project'
+import { useTagStore } from './tagStore'
 
 function markDirty() {
   try {
@@ -94,8 +95,22 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
+  async function saveRemoteProject(data: any) {
+    try {
+      const existing = projects.value.find(p => p.id === data.id)
+      if (existing) {
+        await updateProject(data.id, data)
+      } else {
+        // 用服务端 ID 直接插入
+        const result = await projectService.create({ ...data, _remoteId: data.id })
+        if (result) projects.value = [...projects.value, result]
+      }
+    } catch { /* ignore */ }
+  }
+
   function setCurrentProject(projectId: number) {
     currentProjectId.value = projectId
+    useTagStore().loadProjectTags(projectId)
   }
 
   async function toggleProjectStatus(id: number) {
@@ -123,6 +138,7 @@ export const useProjectStore = defineStore('projects', () => {
     deleteProject,
     setCurrentProject,
     toggleProjectStatus,
+    saveRemoteProject,
     clearError
   }
 })

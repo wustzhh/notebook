@@ -55,8 +55,11 @@ function registerSyncHandlers() {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${t}` }
         });
-        if (!response.ok)
+        if (!response.ok) {
+            if (response.status === 401)
+                throw new Error('TOKEN_EXPIRED');
             throw new Error('获取全量数据失败');
+        }
         return await response.json();
     });
     electron_1.ipcMain.handle('sync:health', async (_event, serverUrl) => {

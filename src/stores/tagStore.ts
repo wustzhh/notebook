@@ -9,20 +9,28 @@ export const useTagStore = defineStore('tags', () => {
 
   async function loadProjectTags(projectId: number) {
     try {
-      tags.value = await window.tagAPI.getByProject(projectId)
+      const result = await window.tagAPI.getByProject(projectId)
+      // 合并：更新已有、添加新的，不删其他项目的标签
+      for (const t of result) {
+        const idx = tags.value.findIndex(tt => tt.id === t.id)
+        if (idx >= 0) {
+          tags.value[idx] = t
+        } else {
+          tags.value.push(t)
+        }
+      }
     } catch {
-      // electron not available
-      tags.value = []
+      // fallback
     }
   }
 
   async function loadTaskTags(taskId: number) {
     try {
       const result = await window.tagAPI.getForTask(taskId)
-      taskTags.value[taskId] = result
-    } catch {
-      taskTags.value[taskId] = []
-    }
+      if (result && result.length > 0) {
+        taskTags.value[taskId] = result
+      }
+    } catch { /* keep existing */ }
   }
 
   async function createTag(name: string, color: string): Promise<Tag | null> {
@@ -46,9 +54,15 @@ export const useTagStore = defineStore('tags', () => {
   async function setTaskTags(taskId: number, tagIds: number[]) {
     try {
       await window.tagAPI.setTaskTags(taskId, tagIds)
-      // 重新从 DB 加载确保准确
-      taskTags.value[taskId] = await window.tagAPI.getForTask(taskId)
-    } catch { /* ignore */ }
+      const result = await window.tagAPI.getForTask(taskId)
+      if (result && result.length > 0) {
+        taskTags.value[taskId] = result
+      } else {
+        taskTags.value[taskId] = tags.value.filter(t => tagIds.includes(t.id))
+      }
+    } catch {
+      taskTags.value[taskId] = tags.value.filter(t => tagIds.includes(t.id))
+    }
   }
 
   function getTaskTags(taskId: number): Tag[] {

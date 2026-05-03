@@ -7,22 +7,23 @@ export const useLogStore = defineStore('logs', () => {
 
   async function loadTaskLogs(taskId: number) {
     try {
-      logs.value[taskId] = await window.logAPI.getByTask(taskId)
-    } catch {
-      logs.value[taskId] = []
-    }
+      const result = await window.logAPI.getByTask(taskId)
+      if (result.length > 0) {
+        logs.value[taskId] = result
+      }
+    } catch { /* keep existing if load fails */ }
   }
 
   async function loadCommentCounts(taskIds: number[]) {
-    // 只加载还未缓存的
     const uncached = taskIds.filter(id => !logs.value[id])
     if (uncached.length === 0) return
     for (const id of uncached) {
       try {
-        logs.value[id] = await window.logAPI.getByTask(id)
-      } catch {
-        logs.value[id] = []
-      }
+        const result = await window.logAPI.getByTask(id)
+        if (result.length > 0) {
+          logs.value[id] = result
+        }
+      } catch { /* keep existing */ }
     }
   }
 

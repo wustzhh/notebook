@@ -286,7 +286,7 @@ const taskTags = computed(() => task.value ? tagStore.getTaskTags(task.value.id)
 const availableTags = computed(() => {
   if (!task.value) return tagStore.tags
   const used = taskTags.value.map(t => t.id)
-  return tagStore.tags.filter(t => !used.includes(t.id))
+  return tagStore.tags.filter(t => t.project_id === task.value!.project_id && !used.includes(t.id))
 })
 const logCount = computed(() => task.value ? (logStore.logs[task.value.id]?.length || 0) : 0)
 const taskLogs = computed(() => task.value ? logStore.getTaskLogs(task.value.id) : [])
@@ -312,7 +312,8 @@ function formatLogTime(iso: string) {
 
 async function handleAddTag(values: (number | string)[]) {
   if (!task.value) return
-  const ids: number[] = []
+  // 从已有标签开始
+  const ids: number[] = [...taskTags.value.map(t => t.id)]
   for (const v of values) {
     if (typeof v === 'string') {
       const tag = await tagStore.createTag(v, '#409EFF')
@@ -321,7 +322,6 @@ async function handleAddTag(values: (number | string)[]) {
       ids.push(v)
     }
   }
-  // 去重
   const unique = [...new Set(ids)]
   await tagStore.setTaskTags(task.value.id, unique)
   newTagIds.value = []
@@ -356,6 +356,7 @@ watch(task, () => {
   activeTab.value = 'detail'
   commentText.value = ''
   if (task.value) {
+    tagStore.loadProjectTags(task.value.project_id)
     tagStore.loadTaskTags(task.value.id)
   }
 })

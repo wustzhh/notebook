@@ -8,6 +8,7 @@ interface TaskAPI {
   update: (id: number, data: any) => Promise<any>
   delete: (id: number) => Promise<void>
   reorder: (updates: Array<{ id: number; status: string; position: number }>) => Promise<void>
+  saveAll: (data: any[]) => Promise<void>
 }
 
 interface ProjectAPI {
@@ -16,6 +17,8 @@ interface ProjectAPI {
   create: (project: any) => Promise<any>
   update: (id: number, data: any) => Promise<any>
   delete: (id: number) => Promise<void>
+  saveAll: (data: any[]) => Promise<void>
+  clearAll: () => Promise<void>
 }
 
 // 安全的 API 暴露
@@ -25,7 +28,8 @@ const taskAPI: TaskAPI = {
   create: (task: any) => ipcRenderer.invoke('tasks:create', task),
   update: (id: number, data: any) => ipcRenderer.invoke('tasks:update', id, data),
   delete: (id: number) => ipcRenderer.invoke('tasks:delete', id),
-  reorder: (updates) => ipcRenderer.invoke('tasks:reorder', updates)
+  reorder: (updates) => ipcRenderer.invoke('tasks:reorder', updates),
+  saveAll: (data: any[]) => ipcRenderer.invoke('tasks:save-all', data)
 }
 
 const projectAPI: ProjectAPI = {
@@ -33,7 +37,9 @@ const projectAPI: ProjectAPI = {
   getById: (id: number) => ipcRenderer.invoke('projects:get-by-id', id),
   create: (project: any) => ipcRenderer.invoke('projects:create', project),
   update: (id: number, data: any) => ipcRenderer.invoke('projects:update', id, data),
-  delete: (id: number) => ipcRenderer.invoke('projects:delete', id)
+  delete: (id: number) => ipcRenderer.invoke('projects:delete', id),
+  saveAll: (data: any[]) => ipcRenderer.invoke('projects:save-all', data),
+  clearAll: () => ipcRenderer.invoke('projects:clear-all')
 }
 
 // 暴露到 window 对象
@@ -58,11 +64,13 @@ interface TagAPI {
   create: (data: any) => Promise<any>
   delete: (id: number) => Promise<void>
   setTaskTags: (taskId: number, tagIds: number[]) => Promise<void>
+  saveAll: (tags: any[], taskTags: any[]) => Promise<void>
 }
 
 interface LogAPI {
   getByTask: (taskId: number) => Promise<any[]>
   create: (data: any) => Promise<void>
+  saveAll: (data: any[]) => Promise<void>
 }
 
 const tagAPI: TagAPI = {
@@ -70,12 +78,14 @@ const tagAPI: TagAPI = {
   getForTask: (taskId: number) => ipcRenderer.invoke('tags:get-for-task', taskId),
   create: (data: any) => ipcRenderer.invoke('tags:create', data),
   delete: (id: number) => ipcRenderer.invoke('tags:delete', id),
-  setTaskTags: (taskId: number, tagIds: number[]) => ipcRenderer.invoke('tags:set-task-tags', taskId, tagIds)
+  setTaskTags: (taskId: number, tagIds: number[]) => ipcRenderer.invoke('tags:set-task-tags', taskId, tagIds),
+  saveAll: (tags: any[], taskTags: any[]) => ipcRenderer.invoke('tags:save-all', tags, taskTags)
 }
 
 const logAPI: LogAPI = {
   getByTask: (taskId: number) => ipcRenderer.invoke('logs:get-by-task', taskId),
-  create: (data: any) => ipcRenderer.invoke('logs:create', data)
+  create: (data: any) => ipcRenderer.invoke('logs:create', data),
+  saveAll: (data: any[]) => ipcRenderer.invoke('logs:save-all', data)
 }
 
 contextBridge.exposeInMainWorld('tagAPI', tagAPI)

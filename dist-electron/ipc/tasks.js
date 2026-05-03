@@ -45,18 +45,15 @@ function registerTaskHandlers(mainWindow) {
             // 获取当前最大 position
             const maxPosResult = (0, database_js_1.queryOne)('SELECT MAX(position) as max_pos FROM tasks WHERE status = ?', [taskData.status || 'todo']);
             const newPosition = (maxPosResult?.max_pos || 0) + 1;
-            const id = (0, database_js_1.execute)(`INSERT INTO tasks (title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-                taskData.title,
-                taskData.description || '',
-                taskData.project_id || 1,
-                taskData.parent_id || null,
-                taskData.status || 'todo',
-                taskData.priority || 'medium',
-                taskData.start_date || null,
-                taskData.end_date || null,
-                newPosition
-            ]);
+            let id;
+            if (taskData._remoteId) {
+                id = (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]);
+            }
+            else {
+                id = (0, database_js_1.execute)(`INSERT INTO tasks (title, description, project_id, parent_id, status, priority, start_date, end_date, position)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]);
+            }
             const newTask = (0, database_js_1.queryOne)(`
         SELECT t.*, p.name as project_name, p.key as project_key
         FROM tasks t
@@ -110,6 +107,7 @@ function registerTaskHandlers(mainWindow) {
                 fields.push('parent_id = ?');
                 values.push(data.parent_id);
             }
+            fields.push('sync_version = 0');
             fields.push('updated_at = CURRENT_TIMESTAMP');
             values.push(id);
             (0, database_js_1.execute)(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`, values);
@@ -161,5 +159,26 @@ function registerTaskHandlers(mainWindow) {
             console.error('Error reordering tasks:', error);
             throw error;
         }
+    });
+    // 批量保存（同步下载的数据）
+    electron_1.ipcMain.handle('tasks:save-all', async (_event, data) => {
+        await (0, database_js_1.initDatabase)();
+        const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'sync_version', 'created_at', 'updated_at'];
+        for (const t of data) {
+            try {
+                const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()];
+                const existing = (0, database_js_1.queryOne)('SELECT id FROM tasks WHERE id = ?', [t.id]);
+                if (existing) {
+                    (0, database_js_1.execute)(`UPDATE tasks SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, t.id]);
+                }
+                else {
+                    (0, database_js_1.execute)(`INSERT INTO tasks (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals);
+                }
+            }
+            catch (e) {
+                console.error('saveAll task failed:', t.id, e.message);
+            }
+        }
+        console.log('saveAll tasks done:', data.length);
     });
 }

@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { initDatabase, queryAll, execute } from '../database.js'
+import { initDatabase, queryAll, queryOne, execute } from '../database.js'
 
 export function registerLogHandlers() {
   ipcMain.handle('logs:get-by-task', async (_event, taskId: number) => {
@@ -22,6 +22,21 @@ export function registerLogHandlers() {
     } catch (error) {
       console.error('Error creating log:', error)
       throw error
+    }
+  })
+
+  ipcMain.handle('logs:save-all', async (_event, data: any[]) => {
+    await initDatabase()
+    const cols = ['id', 'task_id', 'type', 'content', 'old_value', 'new_value', 'field', 'created_at']
+    for (const l of data) {
+      if (l.type !== 'comment') continue
+      const vals = [l.id, l.task_id, l.type, l.content, l.old_value || null, l.new_value || null, l.field || null, l.created_at || new Date().toISOString()]
+      const existing = queryOne('SELECT id FROM task_logs WHERE id = ?', [l.id])
+      if (!existing) {
+        try {
+          execute(`INSERT INTO task_logs (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals)
+        } catch (e: any) { console.error('saveAll log failed:', l.id, e.message) }
+      }
     }
   })
 }

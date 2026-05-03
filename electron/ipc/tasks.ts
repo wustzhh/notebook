@@ -48,21 +48,20 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
       )
       const newPosition = (maxPosResult?.max_pos || 0) + 1
 
-      const id = execute(
-        `INSERT INTO tasks (title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          taskData.title,
-          taskData.description || '',
-          taskData.project_id || 1,
-          taskData.parent_id || null,
-          taskData.status || 'todo',
-          taskData.priority || 'medium',
-          taskData.start_date || null,
-          taskData.end_date || null,
-          newPosition
-        ]
-      )
+      let id: number
+      if (taskData._remoteId) {
+        id = execute(
+          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
+        )
+      } else {
+        id = execute(
+          `INSERT INTO tasks (title, description, project_id, parent_id, status, priority, start_date, end_date, position)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
+        )
+      }
 
       const newTask = queryOne(`
         SELECT t.*, p.name as project_name, p.key as project_key
@@ -123,6 +122,7 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
         values.push(data.parent_id)
       }
 
+      fields.push('sync_version = 0')
       fields.push('updated_at = CURRENT_TIMESTAMP')
       values.push(id)
 
@@ -188,5 +188,25 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
       console.error('Error reordering tasks:', error)
       throw error
     }
+  })
+
+  // 批量保存（同步下载的数据）
+  ipcMain.handle('tasks:save-all', async (_event, data: any[]) => {
+    await initDatabase()
+    const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'sync_version', 'created_at', 'updated_at']
+    for (const t of data) {
+      try {
+        const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()]
+        const existing = queryOne('SELECT id FROM tasks WHERE id = ?', [t.id])
+        if (existing) {
+          execute(`UPDATE tasks SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, t.id])
+        } else {
+          execute(`INSERT INTO tasks (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals)
+        }
+      } catch (e: any) {
+        console.error('saveAll task failed:', t.id, e.message)
+      }
+    }
+    console.log('saveAll tasks done:', data.length)
   })
 }

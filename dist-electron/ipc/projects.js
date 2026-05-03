@@ -32,12 +32,14 @@ function registerProjectHandlers(mainWindow) {
     electron_1.ipcMain.handle('projects:create', async (_event, projectData) => {
         try {
             await (0, database_js_1.initDatabase)();
-            const id = (0, database_js_1.execute)('INSERT INTO projects (name, key, color, description) VALUES (?, ?, ?, ?)', [
-                projectData.name,
-                projectData.key,
-                projectData.color || '#4A90D9',
-                projectData.description || ''
-            ]);
+            let id;
+            if (projectData._remoteId) {
+                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [projectData._remoteId, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
+                id = projectData._remoteId;
+            }
+            else {
+                id = (0, database_js_1.execute)('INSERT INTO projects (name, key, color, description) VALUES (?, ?, ?, ?)', [projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
+            }
             const newProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
             // 检查返回值是否有效
             if (!newProject) {
@@ -74,6 +76,7 @@ function registerProjectHandlers(mainWindow) {
                 fields.push('status = ?');
                 values.push(data.status);
             }
+            fields.push('sync_version = 0');
             fields.push('updated_at = CURRENT_TIMESTAMP');
             values.push(id);
             (0, database_js_1.execute)(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);
@@ -103,5 +106,29 @@ function registerProjectHandlers(mainWindow) {
             console.error('Error deleting project:', error);
             throw error;
         }
+    });
+    // 批量保存（同步下载的数据直接写入本地 DB）
+    electron_1.ipcMain.handle('projects:save-all', async (_event, data) => {
+        await (0, database_js_1.initDatabase)();
+        for (const p of data) {
+            const cols = ['id', 'name', 'key', 'color', 'description', 'status', 'sync_version', 'created_at', 'updated_at'];
+            const vals = [p.id, p.name, p.key, p.color || '#4A90D9', p.description || '', p.status || 'active', p.sync_version || 0, p.created_at || new Date().toISOString(), p.updated_at || new Date().toISOString()];
+            const existing = (0, database_js_1.queryOne)('SELECT id FROM projects WHERE id = ?', [p.id]);
+            if (existing) {
+                (0, database_js_1.execute)(`UPDATE projects SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, p.id]);
+            }
+            else {
+                (0, database_js_1.execute)(`INSERT INTO projects (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals);
+            }
+        }
+        console.log('saveAll projects done:', data.length, 'items');
+    });
+    electron_1.ipcMain.handle('projects:clear-all', async () => {
+        await (0, database_js_1.initDatabase)();
+        (0, database_js_1.execute)('DELETE FROM task_logs');
+        (0, database_js_1.execute)('DELETE FROM task_tags');
+        (0, database_js_1.execute)('DELETE FROM tasks');
+        (0, database_js_1.execute)('DELETE FROM tags');
+        (0, database_js_1.execute)('DELETE FROM projects');
     });
 }

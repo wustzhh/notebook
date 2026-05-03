@@ -31,15 +31,19 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
     try {
       await initDatabase()
 
-      const id = execute(
-        'INSERT INTO projects (name, key, color, description) VALUES (?, ?, ?, ?)',
-        [
-          projectData.name,
-          projectData.key,
-          projectData.color || '#4A90D9',
-          projectData.description || ''
-        ]
-      )
+      let id: number
+      if (projectData._remoteId) {
+        execute(
+          'INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)',
+          [projectData._remoteId, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
+        )
+        id = projectData._remoteId
+      } else {
+        id = execute(
+          'INSERT INTO projects (name, key, color, description) VALUES (?, ?, ?, ?)',
+          [projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
+        )
+      }
 
       const newProject = queryOne('SELECT * FROM projects WHERE id = ?', [id])
 
@@ -83,6 +87,7 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
         values.push(data.status)
       }
 
+      fields.push('sync_version = 0')
       fields.push('updated_at = CURRENT_TIMESTAMP')
       values.push(id)
 
@@ -117,8 +122,33 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
       // 通知渲染进程
       mainWindow.webContents.send('project-deleted', id)
     } catch (error) {
-      console.error('Error deleting project:', error)
+       console.error('Error deleting project:', error)
       throw error
     }
+  })
+
+  // 批量保存（同步下载的数据直接写入本地 DB）
+  ipcMain.handle('projects:save-all', async (_event, data: any[]) => {
+    await initDatabase()
+    for (const p of data) {
+      const cols = ['id', 'name', 'key', 'color', 'description', 'status', 'sync_version', 'created_at', 'updated_at']
+      const vals = [p.id, p.name, p.key, p.color || '#4A90D9', p.description || '', p.status || 'active', p.sync_version || 0, p.created_at || new Date().toISOString(), p.updated_at || new Date().toISOString()]
+      const existing = queryOne('SELECT id FROM projects WHERE id = ?', [p.id])
+      if (existing) {
+        execute(`UPDATE projects SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, p.id])
+      } else {
+        execute(`INSERT INTO projects (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals)
+      }
+    }
+    console.log('saveAll projects done:', data.length, 'items')
+  })
+
+  ipcMain.handle('projects:clear-all', async () => {
+    await initDatabase()
+    execute('DELETE FROM task_logs')
+    execute('DELETE FROM task_tags')
+    execute('DELETE FROM tasks')
+    execute('DELETE FROM tags')
+    execute('DELETE FROM projects')
   })
 }

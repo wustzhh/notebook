@@ -125,6 +125,27 @@ function createTables() {
     db.run('CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)');
     db.run('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');
     db.run('CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id)');
+    // 清理重复标签
+    try {
+        const dupesStmt = db.prepare('SELECT name, project_id, min(id) as keep_id, count(*) as c FROM tags GROUP BY name, project_id HAVING c > 1');
+        const dupes = [];
+        while (dupesStmt.step()) {
+            const row = dupesStmt.get();
+            dupes.push({ name: row[0], project_id: row[1], keep_id: row[2] });
+        }
+        dupesStmt.free();
+        for (const d of dupes) {
+            const badStmt = db.prepare('SELECT id FROM tags WHERE name=? AND project_id=? AND id!=?');
+            badStmt.bind([d.name, d.project_id, d.keep_id]);
+            while (badStmt.step()) {
+                const badId = badStmt.get()[0];
+                db.run('UPDATE task_tags SET tag_id=? WHERE tag_id=?', [d.keep_id, badId]);
+                db.run('DELETE FROM tags WHERE id=?', [badId]);
+            }
+            badStmt.free();
+        }
+    }
+    catch (e) { /* tags table may not exist yet */ }
     // 插入默认项目（如果不存在）
     const projectCount = db.exec('SELECT COUNT(*) as count FROM projects')[0];
     if (!projectCount || projectCount.values[0][0] === 0) {
@@ -253,8 +274,15 @@ function queryOne(sql, params = []) {
 // 辅助函数：执行插入/更新/删除
 function execute(sql, params = []) {
     const database = getDatabase();
-    database.run(sql, params);
-    // 如果是 INSERT，立即获取 ID（在 saveDatabase 之前）
+    const stmt = database.prepare(sql);
+    try {
+        if (params.length > 0)
+            stmt.bind(params);
+        stmt.step();
+    }
+    finally {
+        stmt.free();
+    }
     if (sql.trim().toUpperCase().startsWith('INSERT')) {
         const result = database.exec('SELECT last_insert_rowid() as id');
         const id = result[0]?.values[0]?.[0] || 0;

@@ -24,4 +24,22 @@ function registerLogHandlers() {
             throw error;
         }
     });
+    electron_1.ipcMain.handle('logs:save-all', async (_event, data) => {
+        await (0, database_js_1.initDatabase)();
+        const cols = ['id', 'task_id', 'type', 'content', 'old_value', 'new_value', 'field', 'created_at'];
+        for (const l of data) {
+            if (l.type !== 'comment')
+                continue;
+            const vals = [l.id, l.task_id, l.type, l.content, l.old_value || null, l.new_value || null, l.field || null, l.created_at || new Date().toISOString()];
+            const existing = (0, database_js_1.queryOne)('SELECT id FROM task_logs WHERE id = ?', [l.id]);
+            if (!existing) {
+                try {
+                    (0, database_js_1.execute)(`INSERT INTO task_logs (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals);
+                }
+                catch (e) {
+                    console.error('saveAll log failed:', l.id, e.message);
+                }
+            }
+        }
+    });
 }

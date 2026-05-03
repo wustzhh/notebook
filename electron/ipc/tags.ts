@@ -28,7 +28,6 @@ export function registerTagHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle('tags:create', async (_event, data: any) => {
     try {
       await initDatabase()
-      // 检查同名标签是否已存在
       const existing = queryOne('SELECT * FROM tags WHERE name = ? AND project_id = ?', [data.name, data.project_id])
       if (existing) return existing
       const id = execute(
@@ -65,6 +64,35 @@ export function registerTagHandlers(mainWindow: BrowserWindow) {
     } catch (error) {
       console.error('Error setting task tags:', error)
       throw error
+    }
+  })
+
+  ipcMain.handle('tags:save-all', async (_event, tagsData: any[], taskTagsData: any[]) => {
+    await initDatabase()
+    if (tagsData && tagsData.length > 0) {
+      const tCols = ['id', 'name', 'color', 'project_id']
+      for (const t of tagsData) {
+        try {
+          const tVals = [t.id, t.name, t.color || '#409EFF', t.project_id]
+          const existing = queryOne('SELECT id FROM tags WHERE id = ?', [t.id])
+          if (existing) {
+            execute(`UPDATE tags SET ${tCols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...tVals, t.id])
+          } else {
+            execute(`INSERT INTO tags (${tCols.join(',')}) VALUES (${tCols.map(() => '?').join(',')})`, tVals)
+          }
+        } catch (e: any) {
+          console.error('saveAll tag failed:', t.id, e.message)
+        }
+      }
+    }
+    if (taskTagsData && taskTagsData.length > 0) {
+      const taskIds = [...new Set(taskTagsData.map((tt: any) => tt.task_id))]
+      for (const tid of taskIds) {
+        execute('DELETE FROM task_tags WHERE task_id = ?', [tid])
+      }
+      for (const tt of taskTagsData) {
+        execute('INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)', [tt.task_id, tt.tag_id])
+      }
     }
   })
 }

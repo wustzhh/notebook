@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useTaskStore } from '@/stores/taskStore'
 import { useProjectStore } from '@/stores/projectStore'
@@ -147,6 +147,14 @@ onMounted(async () => {
     for (const id of ids) {
       await tagStore.loadTaskTags(id)
     }
+  }
+})
+
+watch(() => projectStore.currentProjectId, async () => {
+  await tagStore.loadProjectTags(projectStore.currentProjectId)
+  const ids = taskStore.tasks.map(t => t.id)
+  for (const id of ids) {
+    await tagStore.loadTaskTags(id)
   }
 })
 </script>

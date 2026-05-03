@@ -27,7 +27,6 @@ function registerTagHandlers(mainWindow) {
     electron_1.ipcMain.handle('tags:create', async (_event, data) => {
         try {
             await (0, database_js_1.initDatabase)();
-            // 检查同名标签是否已存在
             const existing = (0, database_js_1.queryOne)('SELECT * FROM tags WHERE name = ? AND project_id = ?', [data.name, data.project_id]);
             if (existing)
                 return existing;
@@ -63,6 +62,36 @@ function registerTagHandlers(mainWindow) {
         catch (error) {
             console.error('Error setting task tags:', error);
             throw error;
+        }
+    });
+    electron_1.ipcMain.handle('tags:save-all', async (_event, tagsData, taskTagsData) => {
+        await (0, database_js_1.initDatabase)();
+        if (tagsData && tagsData.length > 0) {
+            const tCols = ['id', 'name', 'color', 'project_id'];
+            for (const t of tagsData) {
+                try {
+                    const tVals = [t.id, t.name, t.color || '#409EFF', t.project_id];
+                    const existing = (0, database_js_1.queryOne)('SELECT id FROM tags WHERE id = ?', [t.id]);
+                    if (existing) {
+                        (0, database_js_1.execute)(`UPDATE tags SET ${tCols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...tVals, t.id]);
+                    }
+                    else {
+                        (0, database_js_1.execute)(`INSERT INTO tags (${tCols.join(',')}) VALUES (${tCols.map(() => '?').join(',')})`, tVals);
+                    }
+                }
+                catch (e) {
+                    console.error('saveAll tag failed:', t.id, e.message);
+                }
+            }
+        }
+        if (taskTagsData && taskTagsData.length > 0) {
+            const taskIds = [...new Set(taskTagsData.map((tt) => tt.task_id))];
+            for (const tid of taskIds) {
+                (0, database_js_1.execute)('DELETE FROM task_tags WHERE task_id = ?', [tid]);
+            }
+            for (const tt of taskTagsData) {
+                (0, database_js_1.execute)('INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)', [tt.task_id, tt.tag_id]);
+            }
         }
     });
 }

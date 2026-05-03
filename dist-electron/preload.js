@@ -8,14 +8,17 @@ const taskAPI = {
     create: (task) => electron_1.ipcRenderer.invoke('tasks:create', task),
     update: (id, data) => electron_1.ipcRenderer.invoke('tasks:update', id, data),
     delete: (id) => electron_1.ipcRenderer.invoke('tasks:delete', id),
-    reorder: (updates) => electron_1.ipcRenderer.invoke('tasks:reorder', updates)
+    reorder: (updates) => electron_1.ipcRenderer.invoke('tasks:reorder', updates),
+    saveAll: (data) => electron_1.ipcRenderer.invoke('tasks:save-all', data)
 };
 const projectAPI = {
     getAll: () => electron_1.ipcRenderer.invoke('projects:get-all'),
     getById: (id) => electron_1.ipcRenderer.invoke('projects:get-by-id', id),
     create: (project) => electron_1.ipcRenderer.invoke('projects:create', project),
     update: (id, data) => electron_1.ipcRenderer.invoke('projects:update', id, data),
-    delete: (id) => electron_1.ipcRenderer.invoke('projects:delete', id)
+    delete: (id) => electron_1.ipcRenderer.invoke('projects:delete', id),
+    saveAll: (data) => electron_1.ipcRenderer.invoke('projects:save-all', data),
+    clearAll: () => electron_1.ipcRenderer.invoke('projects:clear-all')
 };
 // 暴露到 window 对象
 electron_1.contextBridge.exposeInMainWorld('taskAPI', taskAPI);
@@ -25,11 +28,13 @@ const tagAPI = {
     getForTask: (taskId) => electron_1.ipcRenderer.invoke('tags:get-for-task', taskId),
     create: (data) => electron_1.ipcRenderer.invoke('tags:create', data),
     delete: (id) => electron_1.ipcRenderer.invoke('tags:delete', id),
-    setTaskTags: (taskId, tagIds) => electron_1.ipcRenderer.invoke('tags:set-task-tags', taskId, tagIds)
+    setTaskTags: (taskId, tagIds) => electron_1.ipcRenderer.invoke('tags:set-task-tags', taskId, tagIds),
+    saveAll: (tags, taskTags) => electron_1.ipcRenderer.invoke('tags:save-all', tags, taskTags)
 };
 const logAPI = {
     getByTask: (taskId) => electron_1.ipcRenderer.invoke('logs:get-by-task', taskId),
-    create: (data) => electron_1.ipcRenderer.invoke('logs:create', data)
+    create: (data) => electron_1.ipcRenderer.invoke('logs:create', data),
+    saveAll: (data) => electron_1.ipcRenderer.invoke('logs:save-all', data)
 };
 electron_1.contextBridge.exposeInMainWorld('tagAPI', tagAPI);
 electron_1.contextBridge.exposeInMainWorld('logAPI', logAPI);

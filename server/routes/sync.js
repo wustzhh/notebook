@@ -60,19 +60,19 @@ router.get("/pull", async (req, res) => {
   try {
     await initDb()
     const since = req.query.since || "1970-01-01T00:00:00Z"
-    const projects = queryAll("SELECT * FROM projects WHERE user_id = ? AND updated_at > ?", [req.userId, since])
+    const projects = queryAll("SELECT * FROM projects WHERE user_id = ?", [req.userId])
     const tasks = queryAll("SELECT * FROM tasks WHERE user_id = ? AND updated_at > ?", [req.userId, since])
-    // 拉取所有标签（属于该用户项目的）
     const projectIds = projects.map(p => p.id)
     let tags = [], taskTags = [], logs = []
     if (projectIds.length > 0) {
       const placeholders = projectIds.map(() => "?").join(",")
       tags = queryAll(`SELECT * FROM tags WHERE project_id IN (${placeholders})`, projectIds)
-      const taskIds = tasks.map(t => t.id)
-      if (taskIds.length > 0) {
-        const tPlaceholders = taskIds.map(() => "?").join(",")
-        taskTags = queryAll(`SELECT * FROM task_tags WHERE task_id IN (${tPlaceholders})`, taskIds)
-        logs = queryAll(`SELECT * FROM task_logs WHERE task_id IN (${tPlaceholders}) AND type='comment' AND created_at > ?`, [...taskIds, since])
+      const allTasks = queryAll(`SELECT id FROM tasks WHERE user_id = ?`, [req.userId])
+      const allTaskIds = allTasks.map(t => t.id)
+      if (allTaskIds.length > 0) {
+        const tPlaceholders = allTaskIds.map(() => "?").join(",")
+        taskTags = queryAll(`SELECT * FROM task_tags WHERE task_id IN (${tPlaceholders})`, allTaskIds)
+        logs = queryAll(`SELECT * FROM task_logs WHERE task_id IN (${tPlaceholders}) AND type='comment' AND created_at > ?`, [...allTaskIds, since])
       }
     }
     res.json({ projects, tasks, tags, task_tags: taskTags, task_logs: logs, server_time: new Date().toISOString() })

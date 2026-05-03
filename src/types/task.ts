@@ -39,6 +39,7 @@ export interface TaskCreateData {
   priority?: TaskPriority
   start_date?: string | null
   end_date?: string | null
+  _remoteId?: number
 }
 
 export interface TaskUpdateData {
