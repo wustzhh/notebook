@@ -70,7 +70,17 @@ interface TagAPI {
 interface LogAPI {
   getByTask: (taskId: number) => Promise<any[]>
   create: (data: any) => Promise<void>
+  update: (id: number, content: string) => Promise<void>
+  delete: (id: number) => Promise<void>
   saveAll: (data: any[]) => Promise<void>
+}
+
+const logAPI: LogAPI = {
+  getByTask: (taskId: number) => ipcRenderer.invoke('logs:get-by-task', taskId),
+  create: (data: any) => ipcRenderer.invoke('logs:create', data),
+  update: (id: number, content: string) => ipcRenderer.invoke('logs:update', id, content),
+  delete: (id: number) => ipcRenderer.invoke('logs:delete', id),
+  saveAll: (data: any[]) => ipcRenderer.invoke('logs:save-all', data)
 }
 
 const tagAPI: TagAPI = {
@@ -80,12 +90,6 @@ const tagAPI: TagAPI = {
   delete: (id: number) => ipcRenderer.invoke('tags:delete', id),
   setTaskTags: (taskId: number, tagIds: number[]) => ipcRenderer.invoke('tags:set-task-tags', taskId, tagIds),
   saveAll: (tags: any[], taskTags: any[]) => ipcRenderer.invoke('tags:save-all', tags, taskTags)
-}
-
-const logAPI: LogAPI = {
-  getByTask: (taskId: number) => ipcRenderer.invoke('logs:get-by-task', taskId),
-  create: (data: any) => ipcRenderer.invoke('logs:create', data),
-  saveAll: (data: any[]) => ipcRenderer.invoke('logs:save-all', data)
 }
 
 contextBridge.exposeInMainWorld('tagAPI', tagAPI)

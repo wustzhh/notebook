@@ -15,6 +15,7 @@ export const useProjectStore = defineStore('projects', () => {
   // State
   const projects = ref<Project[]>([])
   const currentProjectId = ref<number>(1)
+  const deletedProjectIds = ref<number[]>(JSON.parse(localStorage.getItem('deleted_project_ids') || '[]'))
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -87,6 +88,8 @@ export const useProjectStore = defineStore('projects', () => {
       if (currentProjectId.value === id) {
         currentProjectId.value = projects.value[0]?.id || 0
       }
+      deletedProjectIds.value.push(id)
+      localStorage.setItem('deleted_project_ids', JSON.stringify(deletedProjectIds.value))
       markDirty()
     } catch (e: any) {
       error.value = e.message
@@ -130,6 +133,7 @@ export const useProjectStore = defineStore('projects', () => {
     currentProject,
     activeProjects,
     completedProjects,
+    deletedProjectIds,
     loading,
     error,
     loadProjects,

@@ -51,9 +51,12 @@ function deleteTaskTags(taskId) {
 
 function upsertLog(log, userId) {
   const existing = queryOne("SELECT id FROM task_logs WHERE id = ?", [log.id])
-  if (existing) return
-  execute("INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-    [log.id, log.task_id, log.type, log.content, log.old_value || null, log.new_value || null, log.field || null, log.created_at || new Date().toISOString()])
+  if (existing) {
+    execute("UPDATE task_logs SET content=? WHERE id=?", [log.content, log.id])
+  } else {
+    execute("INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [log.id, log.task_id, log.type, log.content, log.old_value || null, log.new_value || null, log.field || null, log.created_at || new Date().toISOString()])
+  }
 }
 
 router.get("/pull", async (req, res) => {
@@ -72,7 +75,7 @@ router.get("/pull", async (req, res) => {
       if (allTaskIds.length > 0) {
         const tPlaceholders = allTaskIds.map(() => "?").join(",")
         taskTags = queryAll(`SELECT * FROM task_tags WHERE task_id IN (${tPlaceholders})`, allTaskIds)
-        logs = queryAll(`SELECT * FROM task_logs WHERE task_id IN (${tPlaceholders}) AND type='comment' AND created_at > ?`, [...allTaskIds, since])
+        logs = queryAll(`SELECT * FROM task_logs WHERE task_id IN (${tPlaceholders}) AND type='comment'`, allTaskIds)
       }
     }
     res.json({ projects, tasks, tags, task_tags: taskTags, task_logs: logs, server_time: new Date().toISOString() })
@@ -85,7 +88,7 @@ router.get("/pull", async (req, res) => {
 router.post("/push", async (req, res) => {
   try {
     await initDb()
-    const { projects, tasks, tags, task_tags, task_logs } = req.body
+    const { projects, tasks, tags, task_tags, task_logs, deleted_comment_ids, deleted_project_ids, deleted_task_ids } = req.body
     if (projects) { for (const p of projects) upsertProject(p, req.userId) }
     if (tasks) { for (const t of tasks) upsertTask(t, req.userId) }
     if (tags) { for (const t of tags) upsertTag(t, req.userId) }
@@ -103,6 +106,23 @@ router.post("/push", async (req, res) => {
     if (task_logs) {
       for (const l of task_logs) {
         if (l.type === 'comment') upsertLog(l, req.userId)
+      }
+    }
+    // 删除服务器上的评论
+    if (deleted_comment_ids && deleted_comment_ids.length > 0) {
+      for (const id of deleted_comment_ids) {
+        execute("DELETE FROM task_logs WHERE id = ?", [id])
+      }
+    }
+    // 删除服务器上的项目/任务
+    if (deleted_project_ids && deleted_project_ids.length > 0) {
+      for (const id of deleted_project_ids) {
+        execute("DELETE FROM projects WHERE id = ? AND user_id = ?", [id, req.userId])
+      }
+    }
+    if (deleted_task_ids && deleted_task_ids.length > 0) {
+      for (const id of deleted_task_ids) {
+        execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", [id, req.userId])
       }
     }
     const updatedProjects = queryAll("SELECT id, updated_at, sync_version FROM projects WHERE user_id = ?", [req.userId])

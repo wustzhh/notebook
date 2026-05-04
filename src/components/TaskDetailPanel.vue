@@ -210,8 +210,12 @@
       <div v-if="logLoading" class="empty-logs">加载中...</div>
       <div v-for="log in taskLogs" :key="log.id" class="log-item">
         <span class="log-time">{{ formatLogTime(log.created_at) }}</span>
-        <span class="log-content">{{ log.content }}</span>
+        <template v-if="log.type === 'comment' && editingLogId === log.id">
+          <el-input v-model="editingLogContent" size="small" @blur="saveEditLog(log)" @keyup.enter="saveEditLog(log)" />
+        </template>
+        <span v-else class="log-content" @dblclick="startEditLog(log)">{{ log.content }}</span>
         <span v-if="log.type === 'comment'" class="log-type-badge comment">评论</span>
+        <el-button v-if="log.type === 'comment'" link size="small" class="log-delete" @click="handleDeleteLog(log)"><el-icon><Close /></el-icon></el-button>
       </div>
       <div class="comment-box">
         <el-input v-model="commentText" placeholder="添加评论..." size="small" @keyup.enter="sendComment">
@@ -256,6 +260,8 @@ const activeTab = ref<'detail' | 'activity'>('detail')
 const commentText = ref('')
 const logLoading = ref(false)
 const newTagIds = ref<number[]>([])
+const editingLogId = ref<number | null>(null)
+const editingLogContent = ref('')
 
 // 直接访问 taskStore.tasks 以确保响应式追踪
 const subtasks = computed(() => {
@@ -303,6 +309,24 @@ async function sendComment() {
   await logStore.appendLog(task.value.id, { task_id: task.value.id, type: 'comment', content: commentText.value.trim() })
   try { const { useSyncStore } = require('@/stores/syncStore') || await import('@/stores/syncStore'); useSyncStore().incrementDirty() } catch {}
   commentText.value = ''
+}
+
+function startEditLog(log: any) {
+  editingLogId.value = log.id
+  editingLogContent.value = log.content
+}
+
+async function saveEditLog(log: any) {
+  if (editingLogContent.value.trim()) {
+    await logStore.updateLog(log.id, log.task_id, editingLogContent.value.trim())
+    log.content = editingLogContent.value.trim()
+  }
+  editingLogId.value = null
+}
+
+async function handleDeleteLog(log: any) {
+  await logStore.deleteLog(log.id, log.task_id)
+  try { const { useSyncStore } = require('@/stores/syncStore') || await import('@/stores/syncStore'); useSyncStore().incrementDirty() } catch {}
 }
 
 function formatLogTime(iso: string) {
@@ -709,10 +733,13 @@ function openParentTask() {
 .empty-logs { text-align: center; color: var(--text-tertiary); padding: 40px 0; font-size: 13px; }
 .log-item {
   padding: 10px 0; border-bottom: 1px solid var(--border-color);
-  display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
 }
 .log-time { font-size: 11px; color: var(--text-tertiary); min-width: 70px; }
-.log-content { flex: 1; font-size: 13px; color: var(--text-primary); }
+.log-content { flex: 1; font-size: 13px; color: var(--text-primary); cursor: default; }
 .log-type-badge.comment { font-size: 10px; background: #409eff22; color: #409eff; padding: 1px 6px; border-radius: 8px; }
+.log-delete { opacity: 0; transition: opacity 0.15s; color: var(--text-tertiary); }
+.log-item:hover .log-delete { opacity: 1; }
+.log-delete:hover { color: #f56c6c; }
 .comment-box { margin-top: 12px; }
 </style>

@@ -4,6 +4,7 @@ import type { TaskLog } from '@/types/task'
 
 export const useLogStore = defineStore('logs', () => {
   const logs = ref<Record<number, TaskLog[]>>({})
+  const deletedCommentIds = ref<number[]>(JSON.parse(localStorage.getItem('deleted_comment_ids') || '[]'))
 
   async function loadTaskLogs(taskId: number) {
     try {
@@ -53,5 +54,24 @@ export const useLogStore = defineStore('logs', () => {
     return (logs.value[taskId] || []).filter(l => l.type === 'comment').length
   }
 
-  return { logs, loadTaskLogs, loadCommentCounts, appendLog, getTaskLogs, commentCount }
+  async function updateLog(id: number, taskId: number, content: string) {
+    try {
+      await window.logAPI.update(id, content)
+      const entry = (logs.value[taskId] || []).find(l => l.id === id)
+      if (entry) entry.content = content
+    } catch { /* ignore */ }
+  }
+
+  async function deleteLog(id: number, taskId: number) {
+    try {
+      await window.logAPI.delete(id)
+      if (logs.value[taskId]) {
+        logs.value[taskId] = logs.value[taskId].filter(l => l.id !== id)
+      }
+      deletedCommentIds.value.push(id)
+      localStorage.setItem('deleted_comment_ids', JSON.stringify(deletedCommentIds.value))
+    } catch { /* ignore */ }
+  }
+
+  return { logs, deletedCommentIds, loadTaskLogs, loadCommentCounts, appendLog, updateLog, deleteLog, getTaskLogs, commentCount }
 })

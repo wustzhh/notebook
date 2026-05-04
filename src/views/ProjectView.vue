@@ -57,6 +57,12 @@
                 <span v-else class="list-comment-zero">-</span>
               </template>
             </el-table-column>
+            <el-table-column v-if="uiStore.searchQuery" label="匹配" width="80">
+              <template #default="{ row }">
+                <span v-if="row.matchType === 'tag'" class="match-badge tag-match">🏷 标签</span>
+                <span v-else-if="row.matchType === 'comment'" class="match-badge comment-match">💬 评论</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="end_date" label="截止日期" width="120">
               <template #default="{ row }">
                 {{ row.end_date ? formatDate(row.end_date) : '-' }}
@@ -101,12 +107,16 @@ const filteredParentTasks = computed(() => {
   }
   if (uiStore.searchQuery) {
     const query = uiStore.searchQuery.toLowerCase()
-    parentTasks = parentTasks.filter(t =>
-      t.title.toLowerCase().includes(query) ||
-      t.description?.toLowerCase().includes(query)
-    )
+    parentTasks = parentTasks.filter(t => {
+      const matchTitle = t.title.toLowerCase().includes(query)
+      const matchDesc = t.description?.toLowerCase().includes(query)
+      const matchTag = tagStore.getTaskTags(t.id).some(tag => tag.name.toLowerCase().includes(query))
+      const matchComment = logStore.getTaskLogs(t.id).some(l => l.type === 'comment' && l.content.toLowerCase().includes(query))
+      return matchTitle || matchDesc || matchTag || matchComment
+    })
   }
   return parentTasks.map(task => {
+    const query = (uiStore.searchQuery || '').toLowerCase()
     let subtasks = taskStore.getSubtasks(task.id)
     if (uiStore.filterStatus !== 'all') {
       subtasks = subtasks.filter(t => t.status === uiStore.filterStatus)
@@ -115,13 +125,16 @@ const filteredParentTasks = computed(() => {
       subtasks = subtasks.filter(t => t.priority === uiStore.filterPriority)
     }
     if (uiStore.searchQuery) {
-      const query = uiStore.searchQuery.toLowerCase()
-      subtasks = subtasks.filter(t =>
-        t.title.toLowerCase().includes(query) ||
-        t.description?.toLowerCase().includes(query)
-      )
+      subtasks = subtasks.filter(t => t.title.toLowerCase().includes(query) || t.description?.toLowerCase().includes(query))
     }
-    return { ...task, subtasks, hasSubtasks: subtasks.length > 0 }
+    // 计算匹配类型
+    let matchType: 'title' | 'tag' | 'comment' | 'none' = 'none'
+    if (query) {
+      if (task.title.toLowerCase().includes(query)) matchType = 'title'
+      else if (tagStore.getTaskTags(task.id).some(tag => tag.name.toLowerCase().includes(query))) matchType = 'tag'
+      else if (logStore.getTaskLogs(task.id).some(l => l.type === 'comment' && l.content.toLowerCase().includes(query))) matchType = 'comment'
+    }
+    return { ...task, subtasks, hasSubtasks: subtasks.length > 0, matchType }
   })
 })
 
@@ -255,4 +268,7 @@ watch(() => projectStore.currentProjectId, async () => {
 }
 .list-comment-count { color: var(--text-secondary); font-size: 13px; }
 .list-comment-zero { color: var(--text-tertiary); }
+.match-badge { font-size: 11px; padding: 1px 6px; border-radius: 8px; white-space: nowrap; }
+.tag-match { background: #e6a23c22; color: #e6a23c; }
+.comment-match { background: #409eff22; color: #409eff; }
 </style>

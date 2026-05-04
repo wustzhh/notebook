@@ -26,6 +26,11 @@
         <span v-for="tag in cardTags" :key="tag.id" class="card-tag" :style="{ background: tag.color + '22', color: tag.color }">{{ tag.name }}</span>
       </div>
 
+      <div v-if="cardMatchType" class="card-match">
+        <span v-if="cardMatchType === 'tag'" class="match-tag">🏷 匹配标签</span>
+        <span v-if="cardMatchType === 'comment'" class="match-comment">💬 匹配评论</span>
+      </div>
+
       <h3 class="card-title">{{ task.title }}</h3>
 
       <p v-if="task.description" class="card-description">
@@ -143,6 +148,14 @@ const progress = computed(() => {
 })
 
 const cardTags = computed(() => tagStore.getTaskTags(props.task.id))
+
+const cardMatchType = computed((): 'tag' | 'comment' | null => {
+  const q = uiStore.searchQuery?.toLowerCase()
+  if (!q) return null
+  if (cardTags.value.some(t => t.name.toLowerCase().includes(q))) return 'tag'
+  if (logStore.getTaskLogs(props.task.id).some(l => l.type === 'comment' && l.content.toLowerCase().includes(q))) return 'comment'
+  return null
+})
 
 const cc = computed(() => logStore.commentCount(props.task.id))
 
@@ -274,6 +287,9 @@ function formatDate(date: string) {
 
 .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .card-tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; }
+.card-match { margin-bottom: 8px; font-size: 11px; }
+.match-tag { background: #e6a23c22; color: #e6a23c; padding: 1px 6px; border-radius: 3px; }
+.match-comment { background: #409eff22; color: #409eff; padding: 1px 6px; border-radius: 3px; }
 
 .task-key {
   font-size: 11px;

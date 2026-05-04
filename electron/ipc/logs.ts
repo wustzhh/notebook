@@ -25,6 +25,26 @@ export function registerLogHandlers() {
     }
   })
 
+  ipcMain.handle('logs:update', async (_event, id: number, content: string) => {
+    try {
+      await initDatabase()
+      execute('UPDATE task_logs SET content = ? WHERE id = ?', [content, id])
+    } catch (error) {
+      console.error('Error updating log:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('logs:delete', async (_event, id: number) => {
+    try {
+      await initDatabase()
+      execute('DELETE FROM task_logs WHERE id = ?', [id])
+    } catch (error) {
+      console.error('Error deleting log:', error)
+      throw error
+    }
+  })
+
   ipcMain.handle('logs:save-all', async (_event, data: any[]) => {
     await initDatabase()
     const cols = ['id', 'task_id', 'type', 'content', 'old_value', 'new_value', 'field', 'created_at']

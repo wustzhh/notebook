@@ -19,9 +19,9 @@ async function logChange(taskId: number, data: any) {
 }
 
 export const useTaskStore = defineStore('tasks', () => {
-  // State
   const tasks = ref<Task[]>([])
   const selectedTaskId = ref<number | null>(null)
+  const deletedTaskIds = ref<number[]>(JSON.parse(localStorage.getItem('deleted_task_ids') || '[]'))
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -149,6 +149,8 @@ export const useTaskStore = defineStore('tasks', () => {
     try {
       await taskService.delete(id)
       tasks.value = tasks.value.filter(t => t.id !== id)
+      deletedTaskIds.value.push(id)
+      localStorage.setItem('deleted_task_ids', JSON.stringify(deletedTaskIds.value))
       markDirty()
       if (selectedTaskId.value === id) {
         selectedTaskId.value = null
@@ -362,6 +364,7 @@ export const useTaskStore = defineStore('tasks', () => {
     currentProjectTaskCount,
     selectedTaskId,
     selectedTask,
+    deletedTaskIds,
     tasksByStatus,
     todoTasks,
     inProgressTasks,

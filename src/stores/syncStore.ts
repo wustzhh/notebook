@@ -79,7 +79,10 @@ export const useSyncStore = defineStore('sync', () => {
         tasks: dirtyTasks,
         tags: collectAllTags(),
         task_tags: collectTaskTagsData(),
-        task_logs: comments
+        task_logs: comments,
+        deleted_comment_ids: [...logStore.deletedCommentIds],
+        deleted_project_ids: [...projectStore.deletedProjectIds],
+        deleted_task_ids: [...taskStore.deletedTaskIds]
       })
 
       if (result.projects) {
@@ -95,6 +98,12 @@ export const useSyncStore = defineStore('sync', () => {
         }
       }
 
+      logStore.deletedCommentIds = []
+      localStorage.removeItem('deleted_comment_ids')
+      projectStore.deletedProjectIds = []
+      localStorage.removeItem('deleted_project_ids')
+      taskStore.deletedTaskIds = []
+      localStorage.removeItem('deleted_task_ids')
       dirtyCount.value = 0
       return true
     } catch (e: any) {
@@ -342,7 +351,14 @@ export const useSyncStore = defineStore('sync', () => {
       if (syncLock || !useAuthStore().isLoggedIn) return
       syncLock = true
       try {
-        if (dirtyCount.value > 0) await pushToServer()
+        // 检查是否有需要同步的变更
+        const projectStore = useProjectStore()
+        const taskStore = useTaskStore()
+        const logStore = useLogStore()
+        const hasDirty = projectStore.projects.some(p => !p.sync_version || p.sync_version === 0)
+          || taskStore.tasks.some(t => !t.sync_version || t.sync_version === 0)
+          || logStore.deletedCommentIds.length > 0
+        if (hasDirty) await pushToServer()
         await pullFromServer()
       } finally {
         syncLock = false

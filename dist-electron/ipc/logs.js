@@ -24,6 +24,26 @@ function registerLogHandlers() {
             throw error;
         }
     });
+    electron_1.ipcMain.handle('logs:update', async (_event, id, content) => {
+        try {
+            await (0, database_js_1.initDatabase)();
+            (0, database_js_1.execute)('UPDATE task_logs SET content = ? WHERE id = ?', [content, id]);
+        }
+        catch (error) {
+            console.error('Error updating log:', error);
+            throw error;
+        }
+    });
+    electron_1.ipcMain.handle('logs:delete', async (_event, id) => {
+        try {
+            await (0, database_js_1.initDatabase)();
+            (0, database_js_1.execute)('DELETE FROM task_logs WHERE id = ?', [id]);
+        }
+        catch (error) {
+            console.error('Error deleting log:', error);
+            throw error;
+        }
+    });
     electron_1.ipcMain.handle('logs:save-all', async (_event, data) => {
         await (0, database_js_1.initDatabase)();
         const cols = ['id', 'task_id', 'type', 'content', 'old_value', 'new_value', 'field', 'created_at'];
