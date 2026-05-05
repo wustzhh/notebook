@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { initDatabase, queryAll, queryOne, execute, saveDatabase } from '../database.js'
+import { initDatabase, queryAll, queryOne, execute, saveDatabase, generateId } from '../database.js'
 
 export function registerTaskHandlers(mainWindow: BrowserWindow) {
   // 获取所有任务
@@ -56,10 +56,11 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
           [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
         )
       } else {
-        id = execute(
-          `INSERT INTO tasks (title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
+        id = generateId()
+        execute(
+          `INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
         )
       }
 

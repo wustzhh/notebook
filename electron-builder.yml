@@ -22,3 +22,4 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  artifactName: "Task Tracker Setup.${ext}"

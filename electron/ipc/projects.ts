@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { initDatabase, queryAll, queryOne, execute } from '../database.js'
+import { initDatabase, queryAll, queryOne, execute, generateId } from '../database.js'
 
 export function registerProjectHandlers(mainWindow: BrowserWindow) {
   // 获取所有项目
@@ -39,9 +39,10 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
         )
         id = projectData._remoteId
       } else {
-        id = execute(
-          'INSERT INTO projects (name, key, color, description) VALUES (?, ?, ?, ?)',
-          [projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
+        id = generateId()
+        execute(
+          'INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)',
+          [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
         )
       }
 

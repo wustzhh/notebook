@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initDatabase = initDatabase;
+exports.generateId = generateId;
 exports.saveDatabase = saveDatabase;
 exports.getDatabase = getDatabase;
 exports.queryToObjects = queryToObjects;
@@ -146,23 +147,10 @@ function createTables() {
         }
     }
     catch (e) { /* tags table may not exist yet */ }
-    // 插入默认项目（如果不存在）
-    const projectCount = db.exec('SELECT COUNT(*) as count FROM projects')[0];
-    if (!projectCount || projectCount.values[0][0] === 0) {
-        db.run(`INSERT INTO projects (name, key, color, description)
-            VALUES ('Default Project', 'DEF', '#4A90D9', '默认项目')`);
-    }
-    // 插入示例任务（如果不存在）
-    const taskCount = db.exec('SELECT COUNT(*) as count FROM tasks')[0];
-    if (!taskCount || taskCount.values[0][0] === 0) {
-        db.run(`INSERT INTO tasks (title, description, project_id, status, priority, position) VALUES
-      ('完成项目需求文档', '编写详细的项目需求文档', 1, 'done', 'high', 0),
-      ('设计数据库架构', '设计任务管理系统的数据库架构', 1, 'in_progress', 'high', 1),
-      ('实现用户认证', '实现用户登录和注册功能', 1, 'todo', 'medium', 2),
-      ('前端页面开发', '使用 Vue3 和 Element Plus 开发前端页面', 1, 'todo', 'medium', 3),
-      ('测试和部署', '进行单元测试并部署应用', 1, 'todo', 'low', 4)
-    `);
-    }
+}
+// 生成全局唯一 ID（毫秒时间戳 + 随机数，不同客户端不碰撞）
+function generateId() {
+    return Date.now() * 1000 + Math.floor(Math.random() * 1000);
 }
 // 保存数据库到文件
 function saveDatabase() {

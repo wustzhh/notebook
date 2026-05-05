@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'path'
 import { registerTaskHandlers } from './ipc/tasks.js'
 import { registerProjectHandlers } from './ipc/projects.js'
@@ -47,6 +47,7 @@ function createWindow() {
 
 // 应用准备就绪
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)
   createWindow()
 
   // 注册 IPC 处理器

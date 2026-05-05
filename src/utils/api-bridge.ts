@@ -26,18 +26,10 @@ function loadFromStorage(): StoredData {
 
   // 默认数据
   return {
-    tasks: [
-      { id: 1, title: '完成项目需求文档', description: '编写详细的项目需求文档', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'done', priority: 'high', start_date: null, end_date: null, position: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      { id: 2, title: '设计数据库架构', description: '设计任务管理系统的数据库架构', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'in_progress', priority: 'high', start_date: null, end_date: null, position: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      { id: 3, title: '实现用户认证', description: '实现用户登录和注册功能', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'todo', priority: 'medium', start_date: null, end_date: null, position: 2, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      { id: 4, title: '前端页面开发', description: '使用 Vue3 和 Element Plus 开发前端页面', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'todo', priority: 'medium', start_date: null, end_date: null, position: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      { id: 5, title: '测试和部署', description: '进行单元测试并部署应用', project_id: 1, project_name: 'Default Project', project_key: 'DEF', parent_id: null, status: 'todo', priority: 'low', start_date: null, end_date: null, position: 4, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-    ],
-    projects: [
-      { id: 1, name: 'Default Project', key: 'DEF', color: '#4A90D9', description: '默认项目', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-    ],
-    nextTaskId: 6,
-    nextProjectId: 2
+    tasks: [],
+    projects: [],
+    nextTaskId: 1,
+    nextProjectId: 1
   }
 }
 

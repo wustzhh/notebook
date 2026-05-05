@@ -38,7 +38,8 @@ function registerProjectHandlers(mainWindow) {
                 id = projectData._remoteId;
             }
             else {
-                id = (0, database_js_1.execute)('INSERT INTO projects (name, key, color, description) VALUES (?, ?, ?, ?)', [projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
+                id = (0, database_js_1.generateId)();
+                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
             }
             const newProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
             // 检查返回值是否有效

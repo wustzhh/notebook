@@ -51,8 +51,9 @@ function registerTaskHandlers(mainWindow) {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]);
             }
             else {
-                id = (0, database_js_1.execute)(`INSERT INTO tasks (title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]);
+                id = (0, database_js_1.generateId)();
+                (0, database_js_1.execute)(`INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]);
             }
             const newTask = (0, database_js_1.queryOne)(`
         SELECT t.*, p.name as project_name, p.key as project_key

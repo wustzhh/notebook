@@ -46,6 +46,7 @@ function createWindow() {
 }
 // 应用准备就绪
 electron_1.app.whenReady().then(() => {
+    electron_1.Menu.setApplicationMenu(null);
     createWindow();
     // 注册 IPC 处理器
     (0, tasks_js_1.registerTaskHandlers)(mainWindow);
