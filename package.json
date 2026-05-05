@@ -1,0 +1,38 @@
+{
+  "name": "task-tracker",
+  "version": "1.0.0",
+  "description": "Jira-style task management desktop app",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev:vite": "vite",
+    "dev:electron": "node electron-dev.cjs",
+    "build:vite": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "npm run build:vite && npm run build:electron && electron-builder",
+    "preview": "vite preview"
+  },
+  "keywords": ["electron", "vue", "task-management", "jira"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "dayjs": "^1.11.20",
+    "element-plus": "^2.13.7",
+    "pinia": "^2.1.7",
+    "sql.js": "^1.10.2",
+    "uuid": "^9.0.0",
+    "vue": "^3.5.32",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.7",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "vue-tsc": "^1.8.27"
+  }
+}
