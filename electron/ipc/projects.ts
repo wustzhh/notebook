@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { initDatabase, queryAll, queryOne, execute, generateId } from '../database.js'
+import { initDatabase, queryAll, queryOne, execute } from '../database.js'
+import { getServerConfig } from './serverConfig.js'
 
 export function registerProjectHandlers(mainWindow: BrowserWindow) {
   // 获取所有项目
@@ -30,15 +31,29 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle('projects:create', async (_event, projectData: any) => {
     try {
       await initDatabase()
+      const { serverUrl, token } = getServerConfig()
 
       let id: number
       if (projectData._remoteId) {
         id = projectData._remoteId
-      } else if (projectData._clientId) {
-        id = projectData._clientId
+      } else if (serverUrl && token) {
+        const resp = await fetch(`${serverUrl}/api/projects`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(projectData)
+        })
+        if (!resp.ok) throw new Error('服务器创建项目失败')
+        const result: any = await resp.json()
+        id = result.id
       } else {
-        id = generateId()
+        throw new Error('未连接服务器，请先登录')
       }
+
+      // 写入本地 DB
+      execute(
+        'INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)',
+        [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
+      )
 
       const newProject = queryOne('SELECT * FROM projects WHERE id = ?', [id])
 
@@ -131,7 +146,7 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
       const vals = [p.id, p.name, p.key, p.color || '#4A90D9', p.description || '', p.status || 'active', p.sync_version || 0, p.created_at || new Date().toISOString(), p.updated_at || new Date().toISOString()]
       const existing = queryOne('SELECT id FROM projects WHERE id = ?', [p.id])
       if (existing) {
-        execute(`UPDATE projects SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, p.id])
+        execute('UPDATE projects SET sync_version=?, updated_at=? WHERE id=?', [p.sync_version || 0, p.updated_at || new Date().toISOString(), p.id])
       } else {
         execute(`INSERT INTO projects (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals)
       }

@@ -4,6 +4,7 @@ const cors = require('cors')
 const { initAuthDb } = require('./database')
 const authRoutes = require('./routes/auth')
 const syncRoutes = require('./routes/sync')
+const apiRoutes = require('./routes/api')
 const { verifyToken } = require('./middleware/auth')
 
 const app = express()
@@ -14,6 +15,7 @@ app.use(express.json({ limit: '10mb' }))
 
 app.use('/auth', authRoutes)
 app.use('/sync', verifyToken, syncRoutes)
+app.use('/api', verifyToken, apiRoutes)
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() })

@@ -30,9 +30,9 @@ export const useLogStore = defineStore('logs', () => {
 
   async function appendLog(taskId: number, data: any) {
     try {
-      await window.logAPI.create(data)
+      const id = await window.logAPI.create(data)
       const entry: TaskLog = {
-        id: Date.now(),
+        id: id || Date.now(),
         task_id: taskId,
         type: data.type,
         content: data.content,

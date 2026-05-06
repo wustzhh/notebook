@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerLogHandlers = registerLogHandlers;
 const electron_1 = require("electron");
 const database_js_1 = require("../database.js");
+const serverConfig_js_1 = require("./serverConfig.js");
 function registerLogHandlers() {
     electron_1.ipcMain.handle('logs:get-by-task', async (_event, taskId) => {
         try {
@@ -17,7 +18,23 @@ function registerLogHandlers() {
     electron_1.ipcMain.handle('logs:create', async (_event, data) => {
         try {
             await (0, database_js_1.initDatabase)();
-            (0, database_js_1.execute)('INSERT INTO task_logs (task_id, type, content, old_value, new_value, field) VALUES (?, ?, ?, ?, ?, ?)', [data.task_id, data.type, data.content, data.old_value || null, data.new_value || null, data.field || null]);
+            if (data._remoteLog) {
+                (0, database_js_1.execute)('INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [data.id, data.task_id, data.type, data.content, data.old_value || null, data.new_value || null, data.field || null, data.created_at || new Date().toISOString()]);
+                return;
+            }
+            const { serverUrl, token } = (0, serverConfig_js_1.getServerConfig)();
+            if (!serverUrl || !token)
+                throw new Error('未连接服务器，请先登录');
+            const resp = await fetch(`${serverUrl}/api/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ task_id: data.task_id, type: data.type, content: data.content })
+            });
+            if (!resp.ok)
+                throw new Error('服务器创建评论失败');
+            const result = await resp.json();
+            (0, database_js_1.execute)('INSERT INTO task_logs (id, task_id, type, content, field, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?, ?)', [result.id, data.task_id, data.type, data.content, data.field || null, data.old_value || null, data.new_value || null]);
+            return result.id;
         }
         catch (error) {
             console.error('Error creating log:', error);

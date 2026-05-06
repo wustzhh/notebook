@@ -1,12 +1,14 @@
 import { ipcMain } from 'electron'
+import { setConfig } from './serverConfig.js'
+
+let baseUrl = ''
+let authToken = ''
 
 export function registerSyncHandlers() {
-  let baseUrl = ''
-  let authToken = ''
-
   ipcMain.handle('sync:configure', async (_event, serverUrl: string, token: string) => {
     baseUrl = serverUrl
     authToken = token
+    setConfig(serverUrl, token)
   })
 
   ipcMain.handle('sync:push', async (_event, serverUrl: string, token: string, data: any) => {

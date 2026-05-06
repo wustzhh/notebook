@@ -2,12 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerSyncHandlers = registerSyncHandlers;
 const electron_1 = require("electron");
+const serverConfig_js_1 = require("./serverConfig.js");
+let baseUrl = '';
+let authToken = '';
 function registerSyncHandlers() {
-    let baseUrl = '';
-    let authToken = '';
     electron_1.ipcMain.handle('sync:configure', async (_event, serverUrl, token) => {
         baseUrl = serverUrl;
         authToken = token;
+        (0, serverConfig_js_1.setConfig)(serverUrl, token);
     });
     electron_1.ipcMain.handle('sync:push', async (_event, serverUrl, token, data) => {
         const url = serverUrl || baseUrl;

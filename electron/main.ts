@@ -6,6 +6,7 @@ import { registerAuthHandlers } from './ipc/auth.js'
 import { registerSyncHandlers } from './ipc/sync.js'
 import { registerTagHandlers } from './ipc/tags.js'
 import { registerLogHandlers } from './ipc/logs.js'
+import { registerServerConfigHandlers } from './ipc/serverConfig.js'
 
 // __dirname 在 CommonJS 中全局可用，无需声明
 
@@ -57,6 +58,7 @@ app.whenReady().then(() => {
   registerSyncHandlers()
   registerTagHandlers(mainWindow!)
   registerLogHandlers()
+  registerServerConfigHandlers()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

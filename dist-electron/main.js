@@ -11,6 +11,7 @@ const auth_js_1 = require("./ipc/auth.js");
 const sync_js_1 = require("./ipc/sync.js");
 const tags_js_1 = require("./ipc/tags.js");
 const logs_js_1 = require("./ipc/logs.js");
+const serverConfig_js_1 = require("./ipc/serverConfig.js");
 // __dirname 在 CommonJS 中全局可用，无需声明
 let mainWindow = null;
 function createWindow() {
@@ -55,6 +56,7 @@ electron_1.app.whenReady().then(() => {
     (0, sync_js_1.registerSyncHandlers)();
     (0, tags_js_1.registerTagHandlers)(mainWindow);
     (0, logs_js_1.registerLogHandlers)();
+    (0, serverConfig_js_1.registerServerConfigHandlers)();
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {
             createWindow();

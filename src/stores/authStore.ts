@@ -26,6 +26,8 @@ export const useAuthStore = defineStore('auth', () => {
     email.value = uEmail
     userId.value = uId
     isLoggedIn.value = true
+    // 通知主进程服务端配置
+    try { window.syncAPI.configure(serverUrl.value, t) } catch {}
   }
 
   async function loadFromStorage() {
