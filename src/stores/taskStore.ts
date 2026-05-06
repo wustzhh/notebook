@@ -2,12 +2,13 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { taskService } from '@/services/taskService'
 import { useProjectStore } from './projectStore'
-import type { Task, TaskStatus, TaskCreateData, TaskUpdateData } from '@/types/task'
+import type { Task, TaskStatus, TaskPriority, TaskCreateData, TaskUpdateData } from '@/types/task'
 import { useLogStore } from './logStore'
+import { useAuthStore } from './authStore'
 
 async function markDirty() {
   try {
-    const { useSyncStore } = require('./syncStore')
+    const { useSyncStore } = await import('./syncStore')
     useSyncStore().incrementDirty()
   } catch { /* store not available */ }
 }
@@ -97,6 +98,13 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function createTask(data: TaskCreateData) {
     try {
+      const auth = useAuthStore()
+      if (auth.serverUrl && auth.token) {
+        try {
+          const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
+          ;(data as any)._clientId = result.ids[0]
+        } catch { /* offline, fallback to timestamp */ }
+      }
       const newTask = await taskService.create(data)
       // 检查返回值是否有效
       if (!newTask) {
@@ -313,6 +321,15 @@ export const useTaskStore = defineStore('tasks', () => {
       const parentTask = tasks.value.find(t => t.id === parentId)
       if (!parentTask) throw new Error('父任务不存在')
 
+      let cid: number | undefined
+      const auth = useAuthStore()
+      if (auth.serverUrl && auth.token) {
+        try {
+          const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
+          cid = result.ids[0]
+        } catch { /* offline */ }
+      }
+
       const newTask = await taskService.create({
         title: data.title,
         description: data.description || '',
@@ -320,8 +337,9 @@ export const useTaskStore = defineStore('tasks', () => {
         parent_id: parentId,
         status: data.status || 'todo',
         priority: data.priority || 'medium',
-        position
-      })
+        position,
+        _clientId: cid
+      } as any)
       // 检查返回值是否有效
       if (!newTask) {
         throw new Error('创建子任务失败：返回空值')

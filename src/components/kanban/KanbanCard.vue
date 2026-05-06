@@ -15,7 +15,7 @@
 
     <div class="card-content" @click="handleClick">
       <div class="card-header">
-        <span class="task-key">{{ task.project_key }}-{{ task.id }}</span>
+        <span class="task-key">{{ task.seq_assigned ? task.project_key + '-' + task.seq_number : '' }}</span>
         <span class="header-right">
           <span v-if="cc > 0" class="comment-count">💬 {{ cc }}</span>
           <PriorityBadge :priority="task.priority" />
@@ -72,7 +72,7 @@
             @change="(val) => toggleSubtaskDone(subtask.id, val as boolean)"
             @click.stop
           />
-          <span class="subtask-key">{{ task.project_key }}-{{ subtask.id }}</span>
+          <span class="subtask-key">{{ subtask.seq_assigned ? subtask.project_key + '-' + subtask.seq_number : '' }}</span>
           <span class="subtask-title">{{ subtask.title }}</span>
         </div>
       </div>

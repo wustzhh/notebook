@@ -12,14 +12,14 @@
       <!-- ID (只读) -->
       <div class="field-group">
         <label>ID</label>
-        <p class="value">{{ task.project_key }}-{{ task.id }}</p>
+        <p class="value">{{ task.seq_assigned ? task.project_key + '-' + task.seq_number : '' }}</p>
       </div>
 
       <!-- 父任务信息 -->
       <div v-if="task.parent_id" class="field-group">
         <label>父任务</label>
         <p class="value parent-link clickable" @click="openParentTask">
-          {{ parentTask?.project_key }}-{{ parentTask?.id }} {{ parentTask?.title }}
+          {{ parentTask.seq_assigned ? parentTask.project_key + '-' + parentTask.seq_number : '' }} {{ parentTask.title }}
         </p>
       </div>
 
@@ -154,7 +154,7 @@
               :model-value="subtask.status === 'done'"
               @change="(val) => toggleSubtaskDone(subtask.id, val as boolean)"
             />
-            <span class="subtask-key">{{ task.project_key }}-{{ subtask.id }}</span>
+            <span class="subtask-key">{{ subtask.seq_assigned ? task.project_key + '-' + subtask.seq_number : '' }}</span>
             <span class="subtask-title" @click="openSubtaskDetail(subtask.id)">{{ subtask.title }}</span>
             <StatusTag :status="subtask.status" size="small" />
           </div>

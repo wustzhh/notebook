@@ -14,6 +14,8 @@ export interface Task {
   start_date: string | null
   end_date: string | null
   position: number
+  seq_number: number
+  seq_assigned: number
   sync_version?: number
   created_at: string
   updated_at: string
@@ -39,6 +41,7 @@ export interface TaskCreateData {
   priority?: TaskPriority
   start_date?: string | null
   end_date?: string | null
+  seq_number?: number
   _remoteId?: number
 }
 

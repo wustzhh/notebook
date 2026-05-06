@@ -33,17 +33,11 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
 
       let id: number
       if (projectData._remoteId) {
-        execute(
-          'INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)',
-          [projectData._remoteId, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
-        )
         id = projectData._remoteId
+      } else if (projectData._clientId) {
+        id = projectData._clientId
       } else {
         id = generateId()
-        execute(
-          'INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)',
-          [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
-        )
       }
 
       const newProject = queryOne('SELECT * FROM projects WHERE id = ?', [id])
@@ -89,7 +83,8 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
       }
 
       fields.push('sync_version = 0')
-      fields.push('updated_at = CURRENT_TIMESTAMP')
+      fields.push('updated_at = ?')
+      values.push(new Date().toISOString())
       values.push(id)
 
       execute(

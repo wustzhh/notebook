@@ -1,7 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
-const { initDb } = require('./database')
+const { initAuthDb } = require('./database')
 const authRoutes = require('./routes/auth')
 const syncRoutes = require('./routes/sync')
 const { verifyToken } = require('./middleware/auth')
@@ -20,7 +20,7 @@ app.get('/health', (_req, res) => {
 })
 
 async function start() {
-  await initDb()
+  await initAuthDb()
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Task Tracker Server running on port ${PORT}`)
   })

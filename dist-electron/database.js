@@ -56,22 +56,12 @@ function createTables() {
     try {
         db.run("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'active'");
     }
-    catch (e) {
-        // 列已存在，忽略错误
-    }
+    catch { /* 列已存在 */ }
     // 兼容旧数据库：添加 sync_version 列（如果不存在）
     try {
         db.run("ALTER TABLE projects ADD COLUMN sync_version INTEGER DEFAULT 0");
     }
-    catch (e) {
-        // 列已存在，忽略错误
-    }
-    try {
-        db.run("ALTER TABLE tasks ADD COLUMN sync_version INTEGER DEFAULT 0");
-    }
-    catch (e) {
-        // 列已存在，忽略错误
-    }
+    catch { /* 列已存在 */ }
     db.run(`
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +74,8 @@ function createTables() {
       start_date TEXT,
       end_date TEXT,
       position INTEGER DEFAULT 0,
+      seq_number INTEGER DEFAULT 0,
+      seq_assigned INTEGER DEFAULT 0,
       sync_version INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -91,6 +83,18 @@ function createTables() {
       FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
     )
   `);
+    try {
+        db.run("ALTER TABLE tasks ADD COLUMN sync_version INTEGER DEFAULT 0");
+    }
+    catch { /* 列已存在 */ }
+    try {
+        db.run("ALTER TABLE tasks ADD COLUMN seq_number INTEGER DEFAULT 0");
+    }
+    catch { /* 列已存在 */ }
+    try {
+        db.run("ALTER TABLE tasks ADD COLUMN seq_assigned INTEGER DEFAULT 0");
+    }
+    catch { /* 列已存在 */ }
     db.run(`
     CREATE TABLE IF NOT EXISTS tags (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

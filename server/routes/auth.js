@@ -1,21 +1,21 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-const { initDb, queryOne, execute } = require('../database')
+const { initAuthDb, queryOne, execute } = require('../database')
 const { getJWTSecret } = require('../middleware/auth')
 
 const router = express.Router()
 
 router.post('/login', async (req, res) => {
   try {
-    await initDb()
+    const authDb = await initAuthDb()
     const { email, password } = req.body
 
     if (!email || !password) {
       return res.status(400).json({ error: '请输入邮箱和密码' })
     }
 
-    const user = queryOne('SELECT * FROM users WHERE email = ?', [email])
+    const user = queryOne(authDb, 'SELECT * FROM users WHERE email = ?', [email])
     if (!user) {
       return res.status(401).json({ error: '邮箱或密码错误' })
     }

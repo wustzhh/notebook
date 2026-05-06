@@ -3,10 +3,11 @@ import { ref, computed } from 'vue'
 import { projectService } from '@/services/projectService'
 import type { Project, ProjectStatus, ProjectCreateData, ProjectUpdateData } from '@/types/project'
 import { useTagStore } from './tagStore'
+import { useAuthStore } from './authStore'
 
-function markDirty() {
+async function markDirty() {
   try {
-    const { useSyncStore } = require('./syncStore')
+    const { useSyncStore } = await import('./syncStore')
     useSyncStore().incrementDirty()
   } catch { /* store not available */ }
 }
@@ -14,7 +15,7 @@ function markDirty() {
 export const useProjectStore = defineStore('projects', () => {
   // State
   const projects = ref<Project[]>([])
-  const currentProjectId = ref<number>(1)
+  const currentProjectId = ref<number>(Number(localStorage.getItem('current_project_id')) || 0)
   const deletedProjectIds = ref<number[]>(JSON.parse(localStorage.getItem('deleted_project_ids') || '[]'))
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -38,8 +39,10 @@ export const useProjectStore = defineStore('projects', () => {
     error.value = null
     try {
       projects.value = await projectService.getAll()
-      if (projects.value.length > 0 && !currentProjectId.value) {
-        currentProjectId.value = projects.value[0].id
+      if (projects.value.length > 0) {
+        if (!currentProjectId.value || !projects.value.find(p => p.id === currentProjectId.value)) {
+          currentProjectId.value = projects.value[0].id
+        }
       }
     } catch (e: any) {
       error.value = e.message
@@ -51,6 +54,13 @@ export const useProjectStore = defineStore('projects', () => {
 
   async function createProject(data: ProjectCreateData) {
     try {
+      const auth = useAuthStore()
+      if (auth.serverUrl && auth.token) {
+        try {
+          const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'projects', 1)
+          ;(data as any)._clientId = result.ids[0]
+        } catch { /* offline, fallback to timestamp */ }
+      }
       const newProject = await projectService.create(data)
       // 检查返回值是否有效
       if (!newProject) {
@@ -58,6 +68,7 @@ export const useProjectStore = defineStore('projects', () => {
       }
       // 使用数组替换而非 push，确保触发响应式更新
       projects.value = [...projects.value, newProject]
+      setCurrentProject(newProject.id)
       markDirty()
       return newProject
     } catch (e: any) {
@@ -113,6 +124,7 @@ export const useProjectStore = defineStore('projects', () => {
 
   function setCurrentProject(projectId: number) {
     currentProjectId.value = projectId
+    localStorage.setItem('current_project_id', String(projectId))
     useTagStore().loadProjectTags(projectId)
   }
 

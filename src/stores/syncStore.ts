@@ -68,7 +68,10 @@ export const useSyncStore = defineStore('sync', () => {
         }
       }
 
-      const hasChanges = dirtyProjects.length > 0 || dirtyTasks.length > 0 || comments.length > 0
+      const hasDeletions = projectStore.deletedProjectIds.length > 0
+        || taskStore.deletedTaskIds.length > 0
+        || logStore.deletedCommentIds.length > 0
+      const hasChanges = dirtyProjects.length > 0 || dirtyTasks.length > 0 || comments.length > 0 || hasDeletions
       if (!hasChanges) {
         dirtyCount.value = 0
         return true
@@ -86,15 +89,29 @@ export const useSyncStore = defineStore('sync', () => {
       })
 
       if (result.projects) {
+        const pushedIds = new Set(dirtyProjects.map(p => p.id))
         for (const sp of result.projects) {
+          if (!pushedIds.has(sp.id)) continue
           const p = projectStore.projects.find(pp => pp.id === sp.id)
           if (p) (p as any).sync_version = sp.sync_version
         }
       }
       if (result.tasks) {
+        const pushedIds = new Set(dirtyTasks.map(t => t.id))
         for (const st of result.tasks) {
+          if (!pushedIds.has(st.id)) continue
           const t = taskStore.tasks.find(tt => tt.id === st.id)
           if (t) (t as any).sync_version = st.sync_version
+        }
+      }
+
+      if (result.id_remap) {
+        for (const [oldId, newId] of Object.entries(result.id_remap)) {
+          const pid = Number(oldId)
+          const pp = projectStore.projects.find(p => p.id === pid)
+          if (pp) (pp as any).id = newId as number
+          const tt = taskStore.tasks.find(t => t.id === pid)
+          if (tt) (tt as any).id = newId as number
         }
       }
 
@@ -139,7 +156,9 @@ export const useSyncStore = defineStore('sync', () => {
         for (const sp of result.projects) {
           const idx = projectStore.projects.findIndex(p => p.id === sp.id)
           if (idx >= 0) {
-            projectStore.projects[idx] = sp
+            if (new Date(sp.updated_at) >= new Date(projectStore.projects[idx].updated_at || 0)) {
+              Object.assign(projectStore.projects[idx], sp)
+            }
           } else {
             projectStore.projects.push(sp)
           }
@@ -150,8 +169,15 @@ export const useSyncStore = defineStore('sync', () => {
         for (const st of result.tasks) {
           const idx = taskStore.tasks.findIndex(t => t.id === st.id)
           if (idx >= 0) {
-            taskStore.tasks[idx] = st
+            if (new Date(st.updated_at) >= new Date(taskStore.tasks[idx].updated_at || 0)) {
+              Object.assign(taskStore.tasks[idx], st)
+            }
           } else {
+            const project = projectStore.projects.find(p => p.id === st.project_id)
+            if (project) {
+              st.project_name = project.name
+              st.project_key = project.key
+            }
             taskStore.tasks.push(st)
           }
         }
@@ -324,7 +350,7 @@ export const useSyncStore = defineStore('sync', () => {
       } else if (path === '/sync/full') {
         return await window.syncAPI.full(serverUrl, token)
       }
-    } catch { /* Electron not available, use direct fetch */ }
+    } catch (e: any) { console.warn('syncFetch IPC fallback, error:', e.message) }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -358,6 +384,8 @@ export const useSyncStore = defineStore('sync', () => {
         const hasDirty = projectStore.projects.some(p => !p.sync_version || p.sync_version === 0)
           || taskStore.tasks.some(t => !t.sync_version || t.sync_version === 0)
           || logStore.deletedCommentIds.length > 0
+          || projectStore.deletedProjectIds.length > 0
+          || taskStore.deletedTaskIds.length > 0
         if (hasDirty) await pushToServer()
         await pullFromServer()
       } finally {

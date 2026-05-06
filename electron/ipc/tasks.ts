@@ -50,18 +50,11 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
 
       let id: number
       if (taskData._remoteId) {
-        id = execute(
-          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
-        )
+        id = taskData._remoteId
+      } else if (taskData._clientId) {
+        id = taskData._clientId
       } else {
         id = generateId()
-        execute(
-          `INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
-        )
       }
 
       const newTask = queryOne(`
@@ -124,7 +117,8 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
       }
 
       fields.push('sync_version = 0')
-      fields.push('updated_at = CURRENT_TIMESTAMP')
+      fields.push('updated_at = ?')
+      values.push(new Date().toISOString())
       values.push(id)
 
       execute(
@@ -194,10 +188,10 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
   // 批量保存（同步下载的数据）
   ipcMain.handle('tasks:save-all', async (_event, data: any[]) => {
     await initDatabase()
-    const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'sync_version', 'created_at', 'updated_at']
+    const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'seq_number', 'seq_assigned', 'sync_version', 'created_at', 'updated_at']
     for (const t of data) {
       try {
-        const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()]
+        const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.seq_number || 0, t.seq_assigned || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()]
         const existing = queryOne('SELECT id FROM tasks WHERE id = ?', [t.id])
         if (existing) {
           execute(`UPDATE tasks SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, t.id])

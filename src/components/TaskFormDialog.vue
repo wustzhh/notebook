@@ -34,7 +34,7 @@
           <el-option
             v-for="task in parentTaskOptions"
             :key="task.id"
-            :label="`${task.project_key}-${task.id} ${task.title}`"
+            :label="`${task.project_key}-${task.seq_number || task.id} ${task.title}`"
             :value="task.id"
           />
         </el-select>

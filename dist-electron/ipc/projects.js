@@ -34,12 +34,13 @@ function registerProjectHandlers(mainWindow) {
             await (0, database_js_1.initDatabase)();
             let id;
             if (projectData._remoteId) {
-                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [projectData._remoteId, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
                 id = projectData._remoteId;
+            }
+            else if (projectData._clientId) {
+                id = projectData._clientId;
             }
             else {
                 id = (0, database_js_1.generateId)();
-                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
             }
             const newProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
             // 检查返回值是否有效
@@ -78,7 +79,8 @@ function registerProjectHandlers(mainWindow) {
                 values.push(data.status);
             }
             fields.push('sync_version = 0');
-            fields.push('updated_at = CURRENT_TIMESTAMP');
+            fields.push('updated_at = ?');
+            values.push(new Date().toISOString());
             values.push(id);
             (0, database_js_1.execute)(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);
             const updatedProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
