@@ -111,10 +111,19 @@ async function initUserDb(userId) {
       const counters = {}
       for (const t of unassigned) {
         counters[t.project_id] = (counters[t.project_id] || 0) + 1
-        execute(db, "UPDATE tasks SET seq_number = ?, seq_assigned = 1, updated_at = ? WHERE id = ?",
-          [counters[t.project_id], new Date().toISOString(), t.id])
+        execute(db, "UPDATE tasks SET seq_number = ?, seq_assigned = 1 WHERE id = ?",
+          [counters[t.project_id], t.id])
       }
       console.log(`[user ${userId}] Batch assigned seq_number to ${unassigned.length} tasks`)
+    }
+
+    // 修复旧迁移污染的 updated_at：如果 updated_at > created_at 且任务未真正修改过
+    const polluted = queryAll(db, "SELECT id FROM tasks WHERE seq_assigned = 1 AND updated_at > created_at")
+    if (polluted.length > 0) {
+      for (const t of polluted) {
+        execute(db, "UPDATE tasks SET updated_at = created_at WHERE id = ?", [t.id])
+      }
+      console.log(`[user ${userId}] Repaired updated_at for ${polluted.length} tasks`)
     }
 
     db.run(`

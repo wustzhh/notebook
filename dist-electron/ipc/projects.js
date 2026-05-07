@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerProjectHandlers = registerProjectHandlers;
 const electron_1 = require("electron");
 const database_js_1 = require("../database.js");
-const serverConfig_js_1 = require("./serverConfig.js");
 function registerProjectHandlers(mainWindow) {
     // 获取所有项目
     electron_1.ipcMain.handle('projects:get-all', async () => {
@@ -33,27 +32,19 @@ function registerProjectHandlers(mainWindow) {
     electron_1.ipcMain.handle('projects:create', async (_event, projectData) => {
         try {
             await (0, database_js_1.initDatabase)();
-            const { serverUrl, token } = (0, serverConfig_js_1.getServerConfig)();
             let id;
             if (projectData._remoteId) {
                 id = projectData._remoteId;
+                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [projectData._remoteId, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
             }
-            else if (serverUrl && token) {
-                const resp = await fetch(`${serverUrl}/api/projects`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify(projectData)
-                });
-                if (!resp.ok)
-                    throw new Error('服务器创建项目失败');
-                const result = await resp.json();
-                id = result.id;
+            else if (projectData._clientId) {
+                id = projectData._clientId;
+                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
             }
             else {
-                throw new Error('未连接服务器，请先登录');
+                id = (0, database_js_1.generateId)();
+                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
             }
-            // 写入本地 DB
-            (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
             const newProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
             // 检查返回值是否有效
             if (!newProject) {
@@ -130,7 +121,7 @@ function registerProjectHandlers(mainWindow) {
             const vals = [p.id, p.name, p.key, p.color || '#4A90D9', p.description || '', p.status || 'active', p.sync_version || 0, p.created_at || new Date().toISOString(), p.updated_at || new Date().toISOString()];
             const existing = (0, database_js_1.queryOne)('SELECT id FROM projects WHERE id = ?', [p.id]);
             if (existing) {
-                (0, database_js_1.execute)('UPDATE projects SET sync_version=?, updated_at=? WHERE id=?', [p.sync_version || 0, p.updated_at || new Date().toISOString(), p.id]);
+                (0, database_js_1.execute)(`UPDATE projects SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, p.id]);
             }
             else {
                 (0, database_js_1.execute)(`INSERT INTO projects (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals);

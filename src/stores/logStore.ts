@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { TaskLog } from '@/types/task'
+import { useAuthStore } from './authStore'
+import { getNextLocalId, registerRemoteId } from '@/utils/idManager'
 
 export const useLogStore = defineStore('logs', () => {
   const logs = ref<Record<number, TaskLog[]>>({})
@@ -30,6 +32,21 @@ export const useLogStore = defineStore('logs', () => {
 
   async function appendLog(taskId: number, data: any) {
     try {
+      if (data.type === 'comment') {
+        const auth = useAuthStore()
+        if (auth.isLoggedIn && auth.serverUrl && auth.token) {
+          try {
+            const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'logs', 1)
+            data._clientId = result.ids[0]
+            registerRemoteId('logs', result.ids[0])
+          } catch {
+            auth.forceLogout('服务器连接失败，已退出登录')
+          }
+        }
+        if (!data._clientId) {
+          data._clientId = getNextLocalId('logs')
+        }
+      }
       const id = await window.logAPI.create(data)
       const entry: TaskLog = {
         id: id || Date.now(),

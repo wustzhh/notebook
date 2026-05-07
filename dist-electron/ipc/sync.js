@@ -12,6 +12,7 @@ function registerSyncHandlers() {
         (0, serverConfig_js_1.setConfig)(serverUrl, token);
     });
     electron_1.ipcMain.handle('sync:push', async (_event, serverUrl, token, data) => {
+        console.log('[sync:push IPC] called, url:', !!serverUrl, 'token:', !!token, 'tasks:', data?.tasks?.length);
         const url = serverUrl || baseUrl;
         const t = token || authToken;
         if (!url || !t)

@@ -12,6 +12,7 @@ export function registerSyncHandlers() {
   })
 
   ipcMain.handle('sync:push', async (_event, serverUrl: string, token: string, data: any) => {
+    console.log('[sync:push IPC] called, url:', !!serverUrl, 'token:', !!token, 'tasks:', data?.tasks?.length)
     const url = serverUrl || baseUrl
     const t = token || authToken
     if (!url || !t) throw new Error('未配置同步服务器')

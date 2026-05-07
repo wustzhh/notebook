@@ -5,6 +5,7 @@ import { useProjectStore } from './projectStore'
 import { useTaskStore } from './taskStore'
 import { useTagStore } from './tagStore'
 import { useLogStore } from './logStore'
+import { updateMaxFromItems, updateMaxFromRemap } from '@/utils/idManager'
 
 export const useSyncStore = defineStore('sync', () => {
   const lastSyncTime = ref<string>(localStorage.getItem('sync_last_time') || '')
@@ -49,7 +50,11 @@ export const useSyncStore = defineStore('sync', () => {
 
   async function pushToServer(): Promise<boolean> {
     const auth = useAuthStore()
-    if (!auth.token || !auth.serverUrl) return false
+    console.log('[pushToServer] token:', !!auth.token, 'url:', !!auth.serverUrl, 'loggedIn:', auth.isLoggedIn)
+    if (!auth.token || !auth.serverUrl) {
+      console.log('[pushToServer] ABORT: missing token or serverUrl')
+      return false
+    }
 
     isSyncing.value = true
     lastError.value = null
@@ -60,6 +65,10 @@ export const useSyncStore = defineStore('sync', () => {
 
       const dirtyProjects = projectStore.projects.filter(p => !p.sync_version || p.sync_version === 0)
       const dirtyTasks = taskStore.tasks.filter(t => !t.sync_version || t.sync_version === 0)
+
+      if (dirtyTasks.length > 0) {
+        console.log('[push] dirty tasks:', dirtyTasks.map(t => `${t.id}(${t.seq_number||0}):${t.status}:sv${t.sync_version}`).join(', '))
+      }
 
       const comments: any[] = []
       for (const entryLogs of Object.values(logStore.logs)) {
@@ -72,7 +81,9 @@ export const useSyncStore = defineStore('sync', () => {
         || taskStore.deletedTaskIds.length > 0
         || logStore.deletedCommentIds.length > 0
       const hasChanges = dirtyProjects.length > 0 || dirtyTasks.length > 0 || comments.length > 0 || hasDeletions
+      console.log('[pushToServer] dirtyProjects:', dirtyProjects.length, 'dirtyTasks:', dirtyTasks.length, 'comments:', comments.length, 'deletions:', hasDeletions)
       if (!hasChanges) {
+        console.log('[pushToServer] SKIP: no changes')
         dirtyCount.value = 0
         return true
       }
@@ -101,7 +112,13 @@ export const useSyncStore = defineStore('sync', () => {
         for (const st of result.tasks) {
           if (!pushedIds.has(st.id)) continue
           const t = taskStore.tasks.find(tt => tt.id === st.id)
-          if (t) (t as any).sync_version = st.sync_version
+          if (t) {
+            (t as any).sync_version = st.sync_version
+            if (st.seq_assigned) {
+              ;(t as any).seq_number = st.seq_number
+              ;(t as any).seq_assigned = st.seq_assigned
+            }
+          }
         }
       }
 
@@ -114,6 +131,7 @@ export const useSyncStore = defineStore('sync', () => {
           if (tt) (tt as any).id = newId as number
         }
       }
+      if (result.id_remap) updateMaxFromRemap(result.id_remap)
 
       logStore.deletedCommentIds = []
       localStorage.removeItem('deleted_comment_ids')
@@ -225,6 +243,13 @@ export const useSyncStore = defineStore('sync', () => {
       const newIds = taskStore.tasks.map(t => t.id)
       for (const id of newIds) await tagStore.loadTaskTags(id)
       dirtyCount.value = 0
+
+      updateMaxFromItems('projects', projectStore.projects)
+      updateMaxFromItems('tasks', taskStore.tasks)
+      updateMaxFromItems('tags', tagStore.tags)
+      for (const ls of Object.values(logStore.logs)) {
+        for (const l of ls) updateMaxFromItems('logs', [l])
+      }
 
       return true
     } catch (e: any) {

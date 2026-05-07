@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerTagHandlers = registerTagHandlers;
 const electron_1 = require("electron");
 const database_js_1 = require("../database.js");
-const serverConfig_js_1 = require("./serverConfig.js");
 function registerTagHandlers(mainWindow) {
     electron_1.ipcMain.handle('tags:get-by-project', async (_event, projectId) => {
         try {
@@ -31,18 +30,16 @@ function registerTagHandlers(mainWindow) {
             const existing = (0, database_js_1.queryOne)('SELECT * FROM tags WHERE name = ? AND project_id = ?', [data.name, data.project_id]);
             if (existing)
                 return existing;
-            const { serverUrl, token } = (0, serverConfig_js_1.getServerConfig)();
-            if (!serverUrl || !token)
-                throw new Error('未连接服务器，请先登录');
-            const resp = await fetch(`${serverUrl}/api/tags`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(data)
-            });
-            if (!resp.ok)
-                throw new Error('服务器创建标签失败');
-            const result = await resp.json();
-            const id = result.id;
+            let id;
+            if (data._remoteId) {
+                id = data._remoteId;
+            }
+            else if (data._clientId) {
+                id = data._clientId;
+            }
+            else {
+                id = (0, database_js_1.generateId)();
+            }
             (0, database_js_1.execute)('INSERT INTO tags (id, name, color, project_id) VALUES (?, ?, ?, ?)', [id, data.name, data.color || '#409EFF', data.project_id]);
             const tag = (0, database_js_1.queryOne)('SELECT * FROM tags WHERE id = ?', [id]);
             mainWindow.webContents.send('tag-created', tag);

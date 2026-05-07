@@ -5,6 +5,7 @@ import { useProjectStore } from './projectStore'
 import type { Task, TaskStatus, TaskPriority, TaskCreateData, TaskUpdateData } from '@/types/task'
 import { useLogStore } from './logStore'
 import { useAuthStore } from './authStore'
+import { getNextLocalId, registerRemoteId, updateMaxFromItems } from '@/utils/idManager'
 
 async function markDirty() {
   try {
@@ -88,6 +89,7 @@ export const useTaskStore = defineStore('tasks', () => {
     error.value = null
     try {
       tasks.value = await taskService.getAll()
+      updateMaxFromItems('tasks', tasks.value)
     } catch (e: any) {
       error.value = e.message
       console.error('Failed to load tasks:', e)
@@ -99,11 +101,17 @@ export const useTaskStore = defineStore('tasks', () => {
   async function createTask(data: TaskCreateData) {
     try {
       const auth = useAuthStore()
-      if (auth.serverUrl && auth.token) {
+      if (auth.isLoggedIn && auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
           ;(data as any)._clientId = result.ids[0]
-        } catch { /* offline, fallback to timestamp */ }
+          registerRemoteId('tasks', result.ids[0])
+        } catch {
+          auth.forceLogout('服务器连接失败，已退出登录')
+        }
+      }
+      if (!(data as any)._clientId) {
+        ;(data as any)._clientId = getNextLocalId('tasks')
       }
       const newTask = await taskService.create(data)
       // 检查返回值是否有效
@@ -113,6 +121,15 @@ export const useTaskStore = defineStore('tasks', () => {
       tasks.value = [...tasks.value, newTask]
       logChange(newTask.id, { task_id: newTask.id, type: 'created', content: '创建了任务' })
       markDirty()
+
+      // 在线时立即 push 以获取服务器分配的 seq_number
+      if (auth.isLoggedIn) {
+        try {
+          const { useSyncStore } = await import('./syncStore')
+          await useSyncStore().pushToServer()
+        } catch { /* 后台推送 */ }
+      }
+
       return newTask
     } catch (e: any) {
       error.value = e.message
@@ -193,6 +210,11 @@ export const useTaskStore = defineStore('tasks', () => {
 
       // 后台同步到数据库
       await taskService.reorder(updates)
+      // 同步内存中的 sync_version
+      for (const u of updates) {
+        const t = tasks.value.find(tt => tt.id === u.id)
+        if (t) { (t as any).sync_version = 0; (t as any).updated_at = new Date().toISOString() }
+      }
       markDirty()
     } catch (e: any) {
       error.value = e.message
@@ -272,6 +294,11 @@ export const useTaskStore = defineStore('tasks', () => {
       ]
       
       await taskService.reorder(allUpdates)
+      for (const u of allUpdates) {
+        const t = tasks.value.find(tt => tt.id === u.id)
+        if (t) { (t as any).sync_version = 0; (t as any).updated_at = new Date().toISOString() }
+      }
+      markDirty()
     } catch (e: any) {
       error.value = e.message
       console.error('Failed to move task:', e)
@@ -323,11 +350,17 @@ export const useTaskStore = defineStore('tasks', () => {
 
       let cid: number | undefined
       const auth = useAuthStore()
-      if (auth.serverUrl && auth.token) {
+      if (auth.isLoggedIn && auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
           cid = result.ids[0]
-        } catch { /* offline */ }
+          registerRemoteId('tasks', cid)
+        } catch {
+          auth.forceLogout('服务器连接失败，已退出登录')
+        }
+      }
+      if (!cid) {
+        cid = getNextLocalId('tasks')
       }
 
       const newTask = await taskService.create({

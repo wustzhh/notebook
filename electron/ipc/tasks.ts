@@ -1,6 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { initDatabase, queryAll, queryOne, execute, saveDatabase } from '../database.js'
-import { getServerConfig } from './serverConfig.js'
+import { initDatabase, queryAll, queryOne, execute, saveDatabase, generateId } from '../database.js'
 
 export function registerTaskHandlers(mainWindow: BrowserWindow) {
   // 获取所有任务
@@ -52,29 +51,31 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
       let id: number
       if (taskData._remoteId) {
         id = taskData._remoteId
+        execute(
+          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+           taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+           newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0]
+        )
       } else if (taskData._clientId) {
         id = taskData._clientId
-      } else {
-        if (!taskData.project_id) throw new Error('请先选择或创建一个项目')
-        const { serverUrl, token } = getServerConfig()
-        if (!serverUrl || !token) throw new Error('未连接服务器，请先登录')
-        const resp = await fetch(`${serverUrl}/api/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify(taskData)
-        })
-        if (!resp.ok) throw new Error('服务器创建任务失败')
-        const result: any = await resp.json()
-        id = result.id
-        console.log('tasks:create server id returned:', id)
         execute(
-          `INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
+          `INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+           taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+           newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0]
         )
-        // 验证写入
-        const check = queryOne('SELECT id FROM tasks WHERE id = ?', [id])
-        console.log('tasks:create local check:', check ? 'ok' : 'NOT FOUND')
+      } else {
+        id = generateId()
+        execute(
+          `INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+           taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+           newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0]
+        )
       }
 
       const newTask = queryOne(`
@@ -187,17 +188,15 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
     try {
       await initDatabase()
 
-      // 使用事务批量更新
+      const now = new Date().toISOString()
       for (const update of updates) {
         execute(
-          'UPDATE tasks SET status = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-          [update.status, update.position, update.id]
+          'UPDATE tasks SET status = ?, position = ?, sync_version = 0, updated_at = ? WHERE id = ?',
+          [update.status, update.position, now, update.id]
         )
       }
 
       saveDatabase()
-
-      // 通知渲染进程刷新
       mainWindow.webContents.send('tasks-reordered')
     } catch (error) {
       console.error('Error reordering tasks:', error)
@@ -208,14 +207,14 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
   // 批量保存（同步下载的数据）
   ipcMain.handle('tasks:save-all', async (_event, data: any[]) => {
     await initDatabase()
-    const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'sync_version', 'created_at', 'updated_at']
+    const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'seq_number', 'seq_assigned', 'sync_version', 'created_at', 'updated_at']
     for (const t of data) {
       try {
+        const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.seq_number || 0, t.seq_assigned || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()]
         const existing = queryOne('SELECT id FROM tasks WHERE id = ?', [t.id])
         if (existing) {
-          execute('UPDATE tasks SET sync_version=?, updated_at=? WHERE id=?', [t.sync_version || 0, t.updated_at || new Date().toISOString(), t.id])
+          execute(`UPDATE tasks SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, t.id])
         } else {
-          const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()]
           execute(`INSERT INTO tasks (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`, vals)
         }
       } catch (e: any) {

@@ -1,6 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { initDatabase, queryAll, queryOne, execute } from '../database.js'
-import { getServerConfig } from './serverConfig.js'
+import { initDatabase, queryAll, queryOne, execute, generateId } from '../database.js'
 
 export function registerTagHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle('tags:get-by-project', async (_event, projectId: number) => {
@@ -31,16 +30,16 @@ export function registerTagHandlers(mainWindow: BrowserWindow) {
       await initDatabase()
       const existing = queryOne('SELECT * FROM tags WHERE name = ? AND project_id = ?', [data.name, data.project_id])
       if (existing) return existing
-      const { serverUrl, token } = getServerConfig()
-      if (!serverUrl || !token) throw new Error('未连接服务器，请先登录')
-      const resp = await fetch(`${serverUrl}/api/tags`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(data)
-      })
-      if (!resp.ok) throw new Error('服务器创建标签失败')
-      const result: any = await resp.json()
-      const id = result.id
+
+      let id: number
+      if (data._remoteId) {
+        id = data._remoteId
+      } else if (data._clientId) {
+        id = data._clientId
+      } else {
+        id = generateId()
+      }
+
       execute(
         'INSERT INTO tags (id, name, color, project_id) VALUES (?, ?, ?, ?)',
         [id, data.name, data.color || '#409EFF', data.project_id]

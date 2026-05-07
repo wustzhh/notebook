@@ -70,9 +70,12 @@ function upsertTask(db, task, idRemap) {
       sn = nextSeqNumber(db, pid)
       sa = 1
     }
+    console.log(`[upsertTask UPDATE] id=${existing.id} status=${task.status} client_ts=${task.updated_at} server_ts=${existing.updated_at}`)
     execute(db, "UPDATE tasks SET title=?, description=?, project_id=?, parent_id=?, status=?, priority=?, start_date=?, end_date=?, position=?, seq_number=?, seq_assigned=?, sync_version=?, updated_at=? WHERE id=?",
       [task.title, task.description || "", pid, parentId, task.status, task.priority, task.start_date, task.end_date,
        task.position, sn, sa, task.sync_version || 1, new Date(task.updated_at).toISOString(), existing.id])
+  } else {
+    console.log(`[upsertTask SKIP] id=${existing.id} status=${task.status} client_ts=${task.updated_at} server_ts=${existing.updated_at} reason=client_older`)
   }
   if (existing.id !== task.id) idRemap[task.id] = existing.id
 }
@@ -166,9 +169,11 @@ router.get("/pull", async (req, res) => {
 })
 
 router.post("/push", async (req, res) => {
+  console.log(`[push REQUEST] user=${req.userId}`)
   try {
     const db = await initUserDb(req.userId)
     const { projects, tasks, tags, task_tags, task_logs, deleted_comment_ids, deleted_project_ids, deleted_task_ids } = req.body
+    console.log(`[push START] user=${req.userId} projects=${(projects||[]).length} tasks=${(tasks||[]).length} tags=${(tags||[]).length} logs=${(task_logs||[]).length}`)
     const idRemap = {}
 
     if (projects) { for (const p of projects) upsertProject(db, p, idRemap) }
@@ -201,7 +206,7 @@ router.post("/push", async (req, res) => {
     saveUserDb(req.userId)
 
     const updatedProjects = queryAll(db, "SELECT id, updated_at, sync_version FROM projects")
-    const updatedTasks = queryAll(db, "SELECT id, updated_at, sync_version FROM tasks")
+    const updatedTasks = queryAll(db, "SELECT id, seq_number, seq_assigned, updated_at, sync_version FROM tasks")
     res.json({ ok: true, projects: updatedProjects, tasks: updatedTasks, id_remap: idRemap, server_time: new Date().toISOString() })
   } catch (err) {
     console.error("Push error:", err)

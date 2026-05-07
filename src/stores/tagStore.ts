@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Tag } from '@/types/tag'
 import { useProjectStore } from './projectStore'
+import { useAuthStore } from './authStore'
+import { getNextLocalId, registerRemoteId } from '@/utils/idManager'
 
 export const useTagStore = defineStore('tags', () => {
   const tags = ref<Tag[]>([])
@@ -36,7 +38,23 @@ export const useTagStore = defineStore('tags', () => {
   async function createTag(name: string, color: string): Promise<Tag | null> {
     try {
       const projectId = useProjectStore().currentProjectId
-      const tag = await window.tagAPI.create({ name, color, project_id: projectId })
+      const data: any = { name, color, project_id: projectId }
+
+      const auth = useAuthStore()
+      if (auth.isLoggedIn && auth.serverUrl && auth.token) {
+        try {
+          const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tags', 1)
+          data._clientId = result.ids[0]
+          registerRemoteId('tags', result.ids[0])
+        } catch {
+          auth.forceLogout('服务器连接失败，已退出登录')
+        }
+      }
+      if (!data._clientId) {
+        data._clientId = getNextLocalId('tags')
+      }
+
+      const tag = await window.tagAPI.create(data)
       tags.value.push(tag)
       return tag
     } catch {

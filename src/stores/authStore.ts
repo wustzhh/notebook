@@ -15,6 +15,9 @@ export const useAuthStore = defineStore('auth', () => {
   const serverUrl = ref(localStorage.getItem('sync_server_url') || '')
   const isLoggedIn = ref(false)
   const loading = ref(false)
+  const logoutReason = ref<string | null>(null)
+  const serverOnline = ref(false)
+  let _hbTimer: ReturnType<typeof setInterval> | null = null
 
   function setServerUrl(url: string) {
     serverUrl.value = url
@@ -26,6 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
     email.value = uEmail
     userId.value = uId
     isLoggedIn.value = true
+    serverOnline.value = true
+    startHeartbeat()
     // 通知主进程服务端配置
     try { window.syncAPI.configure(serverUrl.value, t) } catch {}
   }
@@ -80,7 +85,59 @@ export const useAuthStore = defineStore('auth', () => {
     return null
   }
 
+  function forceLogout(reason: string) {
+    stopHeartbeat()
+    token.value = null
+    email.value = null
+    userId.value = null
+    isLoggedIn.value = false
+    logoutReason.value = reason
+    try {
+      window.authAPI.clearToken()
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_cred')
+    } catch {}
+  }
+
+  function setOffline(reason: string) {
+    if (isLoggedIn.value) {
+      isLoggedIn.value = false
+      serverOnline.value = false
+      logoutReason.value = reason
+    }
+  }
+
+  function startHeartbeat() {
+    if (_hbTimer) return
+    _hbTimer = setInterval(async () => {
+      if (!serverUrl.value) return
+      try {
+        const resp = await fetch(`${serverUrl.value}/health`, {
+          method: 'GET', signal: AbortSignal.timeout(3000)
+        })
+        if (resp.ok) {
+          if (!serverOnline.value) serverOnline.value = true
+          if (!isLoggedIn.value) {
+            const ok = await autoRelogin()
+            if (!ok) setOffline('自动登录失败')
+          }
+          logoutReason.value = null
+        } else {
+          setOffline('服务器响应异常')
+        }
+      } catch {
+        setOffline('服务器连接断开')
+      }
+    }, 5000)
+  }
+
+  function stopHeartbeat() {
+    if (_hbTimer) { clearInterval(_hbTimer); _hbTimer = null }
+    serverOnline.value = false
+  }
+
   async function logout() {
+    stopHeartbeat()
     token.value = null
     email.value = null
     userId.value = null
@@ -170,6 +227,7 @@ export const useAuthStore = defineStore('auth', () => {
     userId,
     serverUrl,
     isLoggedIn,
+    serverOnline,
     loading,
     setServerUrl,
     setAuth,
@@ -178,6 +236,8 @@ export const useAuthStore = defineStore('auth', () => {
     autoRelogin,
     checkAndRefreshToken,
     logout,
+    forceLogout,
+    logoutReason,
     getStoredCredentials,
     isTokenExpired
   }

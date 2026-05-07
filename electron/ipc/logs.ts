@@ -1,6 +1,5 @@
 import { ipcMain } from 'electron'
-import { initDatabase, queryAll, queryOne, execute } from '../database.js'
-import { getServerConfig } from './serverConfig.js'
+import { initDatabase, queryAll, queryOne, execute, generateId } from '../database.js'
 
 export function registerLogHandlers() {
   ipcMain.handle('logs:get-by-task', async (_event, taskId: number) => {
@@ -16,27 +15,21 @@ export function registerLogHandlers() {
   ipcMain.handle('logs:create', async (_event, data: any) => {
     try {
       await initDatabase()
-      if (data._remoteLog) {
-        execute(
-          'INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [data.id, data.task_id, data.type, data.content, data.old_value || null, data.new_value || null, data.field || null, data.created_at || new Date().toISOString()]
-        )
-        return
+      let id: number
+      if (data._remoteId) {
+        id = data._remoteId
+      } else if (data._clientId) {
+        id = data._clientId
+      } else if (data.id) {
+        id = data.id
+      } else {
+        id = generateId()
       }
-      const { serverUrl, token } = getServerConfig()
-      if (!serverUrl || !token) throw new Error('未连接服务器，请先登录')
-      const resp = await fetch(`${serverUrl}/api/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ task_id: data.task_id, type: data.type, content: data.content })
-      })
-      if (!resp.ok) throw new Error('服务器创建评论失败')
-      const result: any = await resp.json()
       execute(
-        'INSERT INTO task_logs (id, task_id, type, content, field, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [result.id, data.task_id, data.type, data.content, data.field || null, data.old_value || null, data.new_value || null]
+        'INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, data.task_id, data.type, data.content, data.old_value || null, data.new_value || null, data.field || null, data.created_at || new Date().toISOString()]
       )
-      return result.id
+      return id
     } catch (error) {
       console.error('Error creating log:', error)
       throw error

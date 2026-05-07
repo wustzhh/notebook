@@ -11,7 +11,7 @@
       >
         <el-table-column label="标识" width="100">
           <template #default="{ row }">
-            <span class="task-key-id">{{ row.seq_assigned ? row.project_key + '-' + row.seq_number : '' }}</span>
+            <span class="task-key-id">{{ row.project_key }}-{{ row.seq_assigned ? row.seq_number : '?' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="title" label="标题" min-width="200">
@@ -137,7 +137,8 @@ onMounted(async () => {
 <style scoped>
 .list-view-wrapper {
   display: flex;
-  height: calc(100vh - 140px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 

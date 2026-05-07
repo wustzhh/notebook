@@ -125,7 +125,9 @@ async function handleDrop(toColumn: string, dropIndex: number) {
   gap: 16px;
   padding: 24px;
   overflow-x: auto;
-  height: 100%;
+  overflow-y: hidden;
+  flex: 1;
+  min-height: 0;
   width: 100%;
 }
 

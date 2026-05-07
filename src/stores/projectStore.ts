@@ -4,6 +4,7 @@ import { projectService } from '@/services/projectService'
 import type { Project, ProjectStatus, ProjectCreateData, ProjectUpdateData } from '@/types/project'
 import { useTagStore } from './tagStore'
 import { useAuthStore } from './authStore'
+import { getNextLocalId, registerRemoteId, updateMaxFromItems } from '@/utils/idManager'
 
 async function markDirty() {
   try {
@@ -39,6 +40,7 @@ export const useProjectStore = defineStore('projects', () => {
     error.value = null
     try {
       projects.value = await projectService.getAll()
+      updateMaxFromItems('projects', projects.value)
       if (projects.value.length > 0) {
         if (!currentProjectId.value || !projects.value.find(p => p.id === currentProjectId.value)) {
           currentProjectId.value = projects.value[0].id
@@ -55,11 +57,17 @@ export const useProjectStore = defineStore('projects', () => {
   async function createProject(data: ProjectCreateData) {
     try {
       const auth = useAuthStore()
-      if (auth.serverUrl && auth.token) {
+      if (auth.isLoggedIn && auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'projects', 1)
           ;(data as any)._clientId = result.ids[0]
-        } catch { /* offline, fallback to timestamp */ }
+          registerRemoteId('projects', result.ids[0])
+        } catch {
+          auth.forceLogout('服务器连接失败，已退出登录')
+        }
+      }
+      if (!(data as any)._clientId) {
+        ;(data as any)._clientId = getNextLocalId('projects')
       }
       const newProject = await projectService.create(data)
       // 检查返回值是否有效
