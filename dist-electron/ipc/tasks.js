@@ -148,6 +148,10 @@ function registerTaskHandlers(mainWindow) {
     electron_1.ipcMain.handle('tasks:delete', async (_event, id) => {
         try {
             await (0, database_js_1.initDatabase)();
+            (0, database_js_1.execute)('DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE parent_id = ?)', [id]);
+            (0, database_js_1.execute)('DELETE FROM task_logs WHERE task_id = ?', [id]);
+            (0, database_js_1.execute)('DELETE FROM task_tags WHERE task_id = ?', [id]);
+            (0, database_js_1.execute)('DELETE FROM tasks WHERE parent_id = ?', [id]);
             (0, database_js_1.execute)('DELETE FROM tasks WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('task-deleted', id);

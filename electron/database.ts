@@ -117,6 +117,15 @@ function createTables() {
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)')
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id)')
 
+  // 清理孤儿数据
+  try {
+    db.run("DELETE FROM task_logs WHERE task_id NOT IN (SELECT id FROM tasks)")
+    db.run("DELETE FROM task_tags WHERE task_id NOT IN (SELECT id FROM tasks)")
+    db.run("DELETE FROM task_tags WHERE tag_id NOT IN (SELECT id FROM tags)")
+    db.run("DELETE FROM tags WHERE project_id NOT IN (SELECT id FROM projects)")
+    db.run("DELETE FROM tasks WHERE project_id NOT IN (SELECT id FROM projects)")
+  } catch { /* ignore */ }
+
   // 清理重复标签
   try {
     const dupesStmt = db.prepare('SELECT name, project_id, min(id) as keep_id, count(*) as c FROM tags GROUP BY name, project_id HAVING c > 1')

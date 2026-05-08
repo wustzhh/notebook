@@ -87,6 +87,8 @@ function upsertTag(db, tag, idRemap) {
     if (gid >= 1000000000000) {
       gid = allocateIds(db, 'tags')[0]
       idRemap[tag.id] = gid
+    } else {
+      maintainSeq(db, 'tags', gid)
     }
     let pid = idRemap[tag.project_id] || tag.project_id
     execute(db, "INSERT INTO tags (id, name, color, project_id) VALUES (?, ?, ?, ?)",
@@ -113,11 +115,25 @@ function upsertLog(db, log, idRemap) {
     execute(db, "UPDATE task_logs SET content=? WHERE id=?", [log.content, existing.id])
   } else {
     let lid = log.id
-    if (lid >= 1000000000000) lid = allocateIds(db, 'logs')[0]
+    if (lid >= 1000000000000) {
+      lid = allocateIds(db, 'logs')[0]
+    } else {
+      maintainSeq(db, 'logs', lid)
+    }
     let tid = idRemap[log.task_id] || log.task_id
     execute(db, "INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [lid, tid, log.type, log.content, log.old_value || null, log.new_value || null, log.field || null,
        log.created_at || new Date().toISOString()])
+  }
+}
+
+// 确保 id_sequences 跟踪已用的 ID
+function maintainSeq(db, entity, usedId) {
+  const row = queryOne(db, "SELECT next_val FROM id_sequences WHERE entity = ?", [entity])
+  if (!row) {
+    execute(db, "INSERT INTO id_sequences (entity, next_val) VALUES (?, ?)", [entity, usedId + 1])
+  } else if (usedId >= row.next_val) {
+    execute(db, "UPDATE id_sequences SET next_val = ? WHERE entity = ?", [usedId + 1, entity])
   }
 }
 
@@ -193,12 +209,20 @@ router.post("/push", async (req, res) => {
     if (deleted_project_ids && deleted_project_ids.length > 0) {
       for (const id of deleted_project_ids) {
         const realId = idRemap[id] || id
+        execute(db, "DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)", [realId])
+        execute(db, "DELETE FROM task_tags WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)", [realId])
+        execute(db, "DELETE FROM tasks WHERE project_id = ?", [realId])
+        execute(db, "DELETE FROM tags WHERE project_id = ?", [realId])
         execute(db, "DELETE FROM projects WHERE id = ?", [realId])
       }
     }
     if (deleted_task_ids && deleted_task_ids.length > 0) {
       for (const id of deleted_task_ids) {
         const realId = idRemap[id] || id
+        execute(db, "DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE parent_id = ?)", [realId])
+        execute(db, "DELETE FROM task_logs WHERE task_id = ?", [realId])
+        execute(db, "DELETE FROM task_tags WHERE task_id = ?", [realId])
+        execute(db, "DELETE FROM tasks WHERE parent_id = ?", [realId])
         execute(db, "DELETE FROM tasks WHERE id = ?", [realId])
       }
     }

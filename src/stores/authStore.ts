@@ -54,6 +54,8 @@ export const useAuthStore = defineStore('auth', () => {
         } catch { /* invalid token */ }
       }
     }
+    // 有 serverUrl 就先启动心跳，等连上后自动登录
+    if (serverUrl.value) startHeartbeat()
     return false
   }
 

@@ -269,6 +269,12 @@ function remapUserDb(db, userId) {
   execute(db, "INSERT OR REPLACE INTO id_sequences (entity, next_val) VALUES ('logs', ?)", [maxSeqLogId])
 
   console.log(`[user ${userId}] Remap done: ${Object.keys(pidMap).length}p ${Object.keys(tidMap).length}t ${Object.keys(tagIdMap).length}tag ${Object.keys(logIdMap).length}log`)
+
+  // 确保所有实体都有 id_sequences 记录（用 IGNORE 避免覆盖 genId 产生的值）
+  for (const e of ['projects', 'tasks', 'tags', 'logs']) {
+    const maxRow = queryOne(db, `SELECT MAX(id) as m FROM ${e === 'logs' ? 'task_logs' : e}`)
+    execute(db, "INSERT OR IGNORE INTO id_sequences (entity, next_val) VALUES (?, ?)", [e, (maxRow?.m || 0) + 1])
+  }
 }
 
 // --- 查询函数 ---

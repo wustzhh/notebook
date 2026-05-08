@@ -101,11 +101,13 @@ export const useTaskStore = defineStore('tasks', () => {
   async function createTask(data: TaskCreateData) {
     try {
       const auth = useAuthStore()
-      if (auth.isLoggedIn && auth.serverUrl && auth.token) {
+      let online = false
+      if (auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
           ;(data as any)._clientId = result.ids[0]
           registerRemoteId('tasks', result.ids[0])
+          online = true
         } catch {
           auth.forceLogout('服务器连接失败，已退出登录')
         }
@@ -122,12 +124,12 @@ export const useTaskStore = defineStore('tasks', () => {
       logChange(newTask.id, { task_id: newTask.id, type: 'created', content: '创建了任务' })
       markDirty()
 
-      // 在线时立即 push 以获取服务器分配的 seq_number
-      if (auth.isLoggedIn) {
+      // 在线时立即推送获取 seq_number
+      if (online) {
         try {
           const { useSyncStore } = await import('./syncStore')
-          await useSyncStore().pushToServer()
-        } catch { /* 后台推送 */ }
+          await useSyncStore().manualSync()
+        } catch (e: any) { console.warn('immediate sync failed:', e.message) }
       }
 
       return newTask
@@ -350,7 +352,7 @@ export const useTaskStore = defineStore('tasks', () => {
 
       let cid: number | undefined
       const auth = useAuthStore()
-      if (auth.isLoggedIn && auth.serverUrl && auth.token) {
+      if (auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
           cid = result.ids[0]

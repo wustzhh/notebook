@@ -173,6 +173,10 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle('tasks:delete', async (_event, id: number) => {
     try {
       await initDatabase()
+      execute('DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE parent_id = ?)', [id])
+      execute('DELETE FROM task_logs WHERE task_id = ?', [id])
+      execute('DELETE FROM task_tags WHERE task_id = ?', [id])
+      execute('DELETE FROM tasks WHERE parent_id = ?', [id])
       execute('DELETE FROM tasks WHERE id = ?', [id])
 
       // 通知渲染进程

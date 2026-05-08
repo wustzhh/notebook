@@ -41,11 +41,13 @@ export const useTagStore = defineStore('tags', () => {
       const data: any = { name, color, project_id: projectId }
 
       const auth = useAuthStore()
-      if (auth.isLoggedIn && auth.serverUrl && auth.token) {
+      let online = false
+      if (auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tags', 1)
           data._clientId = result.ids[0]
           registerRemoteId('tags', result.ids[0])
+          online = true
         } catch {
           auth.forceLogout('服务器连接失败，已退出登录')
         }
@@ -56,6 +58,14 @@ export const useTagStore = defineStore('tags', () => {
 
       const tag = await window.tagAPI.create(data)
       tags.value.push(tag)
+
+      if (online) {
+        try {
+          const { useSyncStore } = await import('./syncStore')
+          await useSyncStore().manualSync()
+        } catch (e: any) { console.warn('immediate sync failed:', e.message) }
+      }
+
       return tag
     } catch {
       return null

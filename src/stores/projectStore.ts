@@ -57,11 +57,13 @@ export const useProjectStore = defineStore('projects', () => {
   async function createProject(data: ProjectCreateData) {
     try {
       const auth = useAuthStore()
-      if (auth.isLoggedIn && auth.serverUrl && auth.token) {
+      let online = false
+      if (auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'projects', 1)
           ;(data as any)._clientId = result.ids[0]
           registerRemoteId('projects', result.ids[0])
+          online = true
         } catch {
           auth.forceLogout('服务器连接失败，已退出登录')
         }
@@ -78,6 +80,14 @@ export const useProjectStore = defineStore('projects', () => {
       projects.value = [...projects.value, newProject]
       setCurrentProject(newProject.id)
       markDirty()
+
+      if (online) {
+        try {
+          const { useSyncStore } = await import('./syncStore')
+          await useSyncStore().manualSync()
+        } catch (e: any) { console.warn('immediate sync failed:', e.message) }
+      }
+
       return newProject
     } catch (e: any) {
       error.value = e.message

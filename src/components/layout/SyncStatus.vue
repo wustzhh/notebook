@@ -12,12 +12,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useSyncStore } from '@/stores/syncStore'
 import { useAuthStore } from '@/stores/authStore'
 import { CircleCheck, Refresh, Warning, Remove, Link } from '@element-plus/icons-vue'
 
 const syncStore = useSyncStore()
 const authStore = useAuthStore()
+const router = useRouter()
 
 const statusTooltip = computed(() => {
   const map: Record<string, string> = {
@@ -25,14 +27,16 @@ const statusTooltip = computed(() => {
     syncing: '同步中...',
     pending: `有 ${syncStore.dirtyCount} 条待同步`,
     offline: '离线',
-    disconnected: '未登录'
+    disconnected: '未登录 — 点击前往登录'
   }
   return map[syncStore.syncStatus] || ''
 })
 
 function handleClick() {
-  if (authStore.isLoggedIn && syncStore.syncStatus !== 'syncing') {
-    syncStore.manualSync()
+  if (authStore.isLoggedIn) {
+    if (syncStore.syncStatus !== 'syncing') syncStore.manualSync()
+  } else {
+    router.push('/settings')
   }
 }
 </script>

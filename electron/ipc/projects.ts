@@ -125,6 +125,10 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle('projects:delete', async (_event, id: number) => {
     try {
       await initDatabase()
+      execute('DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)', [id])
+      execute('DELETE FROM task_tags WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)', [id])
+      execute('DELETE FROM tasks WHERE project_id = ?', [id])
+      execute('DELETE FROM tags WHERE project_id = ?', [id])
       execute('DELETE FROM projects WHERE id = ?', [id])
 
       // 通知渲染进程

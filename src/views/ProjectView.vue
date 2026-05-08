@@ -5,6 +5,10 @@
       <p>加载中...</p>
     </div>
 
+    <div v-else-if="!projectStore.currentProject" class="empty-project">
+      <p>请先创建或选择一个项目</p>
+    </div>
+
     <template v-else>
       <div class="view-header">
         <div class="view-header-left">
@@ -178,6 +182,15 @@ watch(() => projectStore.currentProjectId, async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.empty-project {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 
 .loading {

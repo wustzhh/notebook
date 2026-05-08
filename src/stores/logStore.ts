@@ -34,7 +34,7 @@ export const useLogStore = defineStore('logs', () => {
     try {
       if (data.type === 'comment') {
         const auth = useAuthStore()
-        if (auth.isLoggedIn && auth.serverUrl && auth.token) {
+        if (auth.serverUrl && auth.token) {
           try {
             const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'logs', 1)
             data._clientId = result.ids[0]
