@@ -37,6 +37,13 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
+  // F12 打开 DevTools
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow?.webContents.toggleDevTools()
+    }
+  })
+
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
   })

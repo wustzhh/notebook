@@ -55,9 +55,9 @@ function upsertTask(db, task, idRemap) {
     let pid = idRemap[task.project_id] || task.project_id
     let parentId = task.parent_id ? (idRemap[task.parent_id] || task.parent_id) : null
     const sn = nextSeqNumber(db, pid)
-    execute(db, "INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, client_id, sync_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    execute(db, "INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images, client_id, sync_version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [tid, task.title || "", task.description || "", pid, parentId, task.status || "todo", task.priority || "medium",
-       task.start_date, task.end_date, task.position || 0, sn, 1, cid, task.sync_version || 1,
+       task.start_date, task.end_date, task.position || 0, sn, 1, task.images || '[]', cid, task.sync_version || 1,
        task.created_at || new Date().toISOString(), task.updated_at || new Date().toISOString()])
     return
   }
@@ -71,9 +71,9 @@ function upsertTask(db, task, idRemap) {
       sa = 1
     }
     console.log(`[upsertTask UPDATE] id=${existing.id} status=${task.status} client_ts=${task.updated_at} server_ts=${existing.updated_at}`)
-    execute(db, "UPDATE tasks SET title=?, description=?, project_id=?, parent_id=?, status=?, priority=?, start_date=?, end_date=?, position=?, seq_number=?, seq_assigned=?, sync_version=?, updated_at=? WHERE id=?",
+    execute(db, "UPDATE tasks SET title=?, description=?, project_id=?, parent_id=?, status=?, priority=?, start_date=?, end_date=?, position=?, seq_number=?, seq_assigned=?, images=?, sync_version=?, updated_at=? WHERE id=?",
       [task.title, task.description || "", pid, parentId, task.status, task.priority, task.start_date, task.end_date,
-       task.position, sn, sa, task.sync_version || 1, new Date(task.updated_at).toISOString(), existing.id])
+       task.position, sn, sa, task.images || '[]', task.sync_version || 1, new Date(task.updated_at).toISOString(), existing.id])
   } else {
     console.log(`[upsertTask SKIP] id=${existing.id} status=${task.status} client_ts=${task.updated_at} server_ts=${existing.updated_at} reason=client_older`)
   }
@@ -121,9 +121,9 @@ function upsertLog(db, log, idRemap) {
       maintainSeq(db, 'logs', lid)
     }
     let tid = idRemap[log.task_id] || log.task_id
-    execute(db, "INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    execute(db, "INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, images, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [lid, tid, log.type, log.content, log.old_value || null, log.new_value || null, log.field || null,
-       log.created_at || new Date().toISOString()])
+       log.images || '[]', log.created_at || new Date().toISOString()])
   }
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="app">
+  <div class="app" :style="themeStore.backgroundImage ? { backgroundImage: 'url(' + themeStore.backgroundImage + ')', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : {}">
     <AppSidebar />
 
     <div class="main-content">

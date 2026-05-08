@@ -56,6 +56,7 @@ export const useLogStore = defineStore('logs', () => {
         old_value: data.old_value || null,
         new_value: data.new_value || null,
         field: data.field || null,
+        images: data.images || '[]',
         created_at: new Date().toISOString()
       }
       if (!logs.value[taskId]) logs.value[taskId] = []

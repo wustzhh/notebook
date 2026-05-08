@@ -74,6 +74,22 @@
       </div>
 
       <div class="section">
+        <h3>外观</h3>
+        <el-form label-width="100px" label-position="left">
+          <el-form-item label="背景图">
+            <div class="bg-actions">
+              <el-button size="small" @click="triggerBgInput">选择图片</el-button>
+              <el-button v-if="themeStore.backgroundImage" size="small" @click="themeStore.setBackgroundImage('')">清除</el-button>
+              <input ref="bgImageInput" type="file" accept="image/*" style="display:none" @change="handleBgImageChange" />
+            </div>
+            <div v-if="themeStore.backgroundImage" class="bg-preview">
+              <img :src="themeStore.backgroundImage" />
+            </div>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <div class="section">
         <h3>应用信息</h3>
         <el-descriptions :column="1" border>
           <el-descriptions-item label="应用名称">Task Tracker</el-descriptions-item>
@@ -90,6 +106,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/authStore'
 import { useSyncStore } from '@/stores/syncStore'
+import { useThemeStore } from '@/stores/themeStore'
 import { useProjectStore } from '@/stores/projectStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useTagStore } from '@/stores/tagStore'
@@ -97,10 +114,12 @@ import { useLogStore } from '@/stores/logStore'
 
 const authStore = useAuthStore()
 const syncStore = useSyncStore()
+const themeStore = useThemeStore()
 
 const serverUrlInput = ref(authStore.serverUrl || '')
 const loginEmail = ref('')
 const loginPassword = ref('')
+const bgImageInput = ref<HTMLInputElement | null>(null)
 
 const syncStatusText = computed(() => {
   const map: Record<string, string> = {
@@ -241,6 +260,28 @@ async function handleClearLocalData() {
   } catch { /* user cancelled */ }
 }
 
+function triggerBgInput() { bgImageInput.value?.click() }
+
+async function handleBgImageChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files?.[0]) {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const scale = Math.min(1600 / img.width, 1)
+        canvas.width = Math.round(img.width * scale)
+        canvas.height = Math.round(img.height * scale)
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+        themeStore.setBackgroundImage(canvas.toDataURL('image/jpeg', 0.7))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(input.files[0])
+  }
+}
+
 function formatTime(iso: string): string {
   if (!iso) return ''
   try { const d = new Date(iso); return d.toLocaleString() }
@@ -258,6 +299,9 @@ function formatTime(iso: string): string {
 .dirty { color: #e6a23c; font-weight: 600; }
 .button-group { display: flex; gap: 8px; flex-wrap: wrap; }
 .hint { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+.bg-actions { display: flex; gap: 8px; }
+.bg-preview { margin-top: 8px; max-width: 320px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); }
+.bg-preview img { width: 100%; display: block; }
 :deep(.el-card) { background: var(--card-bg); border-color: var(--border-color); }
 :deep(.el-descriptions__label),
 :deep(.el-descriptions__content) { color: var(--text-primary); }

@@ -29,6 +29,7 @@ export interface TaskLog {
   old_value: string | null
   new_value: string | null
   field: string | null
+  images?: string
   created_at: string
 }
 

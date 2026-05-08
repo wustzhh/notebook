@@ -38,6 +38,12 @@ function createWindow() {
         // 生产环境加载打包后的文件
         mainWindow.loadFile(path_1.default.join(__dirname, '../dist/index.html'));
     }
+    // F12 打开 DevTools
+    mainWindow.webContents.on('before-input-event', (_event, input) => {
+        if (input.key === 'F12' && input.type === 'keyDown') {
+            mainWindow?.webContents.toggleDevTools();
+        }
+    });
     mainWindow.once('ready-to-show', () => {
         mainWindow?.show();
     });

@@ -92,6 +92,7 @@ async function initUserDb(userId) {
         position INTEGER DEFAULT 0,
         seq_number INTEGER DEFAULT 0,
         seq_assigned INTEGER DEFAULT 0,
+        images TEXT DEFAULT '[]',
         client_id INTEGER,
         sync_version INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -105,6 +106,7 @@ async function initUserDb(userId) {
     try { db.run("ALTER TABLE tasks ADD COLUMN seq_number INTEGER DEFAULT 0") } catch {}
     try { db.run("ALTER TABLE tasks ADD COLUMN seq_assigned INTEGER DEFAULT 0") } catch {}
     try { db.run("ALTER TABLE tasks ADD COLUMN client_id INTEGER") } catch {}
+    try { db.run("ALTER TABLE tasks ADD COLUMN images TEXT DEFAULT '[]'") } catch {}
 
     const unassigned = queryAll(db, "SELECT id, project_id FROM tasks WHERE seq_assigned = 0 ORDER BY created_at")
     if (unassigned.length > 0) {
@@ -155,10 +157,13 @@ async function initUserDb(userId) {
         old_value TEXT,
         new_value TEXT,
         field TEXT,
+        images TEXT DEFAULT '[]',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
       )
     `)
+
+    try { db.run("ALTER TABLE task_logs ADD COLUMN images TEXT DEFAULT '[]'") } catch {}
 
     db.run('CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)')
     db.run('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)')

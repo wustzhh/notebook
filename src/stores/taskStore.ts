@@ -351,12 +351,14 @@ export const useTaskStore = defineStore('tasks', () => {
       if (!parentTask) throw new Error('父任务不存在')
 
       let cid: number | undefined
+      let online = false
       const auth = useAuthStore()
       if (auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
           cid = result.ids[0]
           registerRemoteId('tasks', cid)
+          online = true
         } catch {
           auth.forceLogout('服务器连接失败，已退出登录')
         }
@@ -382,6 +384,14 @@ export const useTaskStore = defineStore('tasks', () => {
       // 使用数组替换而非 push，确保触发响应式更新
       tasks.value = [...tasks.value, newTask]
       markDirty()
+
+      if (online) {
+        try {
+          const { useSyncStore } = await import('./syncStore')
+          await useSyncStore().manualSync()
+        } catch (e: any) { console.warn('immediate sync failed:', e.message) }
+      }
+
       return newTask
     } catch (e: any) {
       error.value = e.message

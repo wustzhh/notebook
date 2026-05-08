@@ -76,6 +76,7 @@ function createTables() {
       position INTEGER DEFAULT 0,
       seq_number INTEGER DEFAULT 0,
       seq_assigned INTEGER DEFAULT 0,
+      images TEXT DEFAULT '[]',
       sync_version INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -93,6 +94,10 @@ function createTables() {
     catch { /* 列已存在 */ }
     try {
         db.run("ALTER TABLE tasks ADD COLUMN seq_assigned INTEGER DEFAULT 0");
+    }
+    catch { /* 列已存在 */ }
+    try {
+        db.run("ALTER TABLE tasks ADD COLUMN images TEXT DEFAULT '[]'");
     }
     catch { /* 列已存在 */ }
     db.run(`
@@ -122,10 +127,15 @@ function createTables() {
       old_value TEXT,
       new_value TEXT,
       field TEXT,
+      images TEXT DEFAULT '[]',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
     )
   `);
+    try {
+        db.run("ALTER TABLE task_logs ADD COLUMN images TEXT DEFAULT '[]'");
+    }
+    catch { /* 列已存在 */ }
     // 创建索引以提升查询性能
     db.run('CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)');
     db.run('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)');

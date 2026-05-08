@@ -30,7 +30,7 @@ function registerLogHandlers() {
             else {
                 id = (0, database_js_1.generateId)();
             }
-            (0, database_js_1.execute)('INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [id, data.task_id, data.type, data.content, data.old_value || null, data.new_value || null, data.field || null, data.created_at || new Date().toISOString()]);
+            (0, database_js_1.execute)('INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, images, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [id, data.task_id, data.type, data.content, data.old_value || null, data.new_value || null, data.field || null, data.images || '[]', data.created_at || new Date().toISOString()]);
             return id;
         }
         catch (error) {
@@ -60,11 +60,11 @@ function registerLogHandlers() {
     });
     electron_1.ipcMain.handle('logs:save-all', async (_event, data) => {
         await (0, database_js_1.initDatabase)();
-        const cols = ['id', 'task_id', 'type', 'content', 'old_value', 'new_value', 'field', 'created_at'];
+        const cols = ['id', 'task_id', 'type', 'content', 'old_value', 'new_value', 'field', 'images', 'created_at'];
         for (const l of data) {
             if (l.type !== 'comment')
                 continue;
-            const vals = [l.id, l.task_id, l.type, l.content, l.old_value || null, l.new_value || null, l.field || null, l.created_at || new Date().toISOString()];
+            const vals = [l.id, l.task_id, l.type, l.content, l.old_value || null, l.new_value || null, l.field || null, l.images || '[]', l.created_at || new Date().toISOString()];
             const existing = (0, database_js_1.queryOne)('SELECT id FROM task_logs WHERE id = ?', [l.id]);
             if (!existing) {
                 try {

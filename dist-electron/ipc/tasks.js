@@ -48,24 +48,24 @@ function registerTaskHandlers(mainWindow) {
             let id;
             if (taskData._remoteId) {
                 id = taskData._remoteId;
-                (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+                (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
                     taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
-                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0]);
+                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']);
             }
             else if (taskData._clientId) {
                 id = taskData._clientId;
-                (0, database_js_1.execute)(`INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+                (0, database_js_1.execute)(`INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
                     taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
-                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0]);
+                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']);
             }
             else {
                 id = (0, database_js_1.generateId)();
-                (0, database_js_1.execute)(`INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+                (0, database_js_1.execute)(`INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
                     taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
-                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0]);
+                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']);
             }
             const newTask = (0, database_js_1.queryOne)(`
         SELECT t.*, p.name as project_name, p.key as project_key
@@ -119,6 +119,10 @@ function registerTaskHandlers(mainWindow) {
             if (data.parent_id !== undefined) {
                 fields.push('parent_id = ?');
                 values.push(data.parent_id);
+            }
+            if (data.images !== undefined) {
+                fields.push('images = ?');
+                values.push(data.images);
             }
             fields.push('sync_version = 0');
             fields.push('updated_at = ?');
@@ -180,10 +184,10 @@ function registerTaskHandlers(mainWindow) {
     // 批量保存（同步下载的数据）
     electron_1.ipcMain.handle('tasks:save-all', async (_event, data) => {
         await (0, database_js_1.initDatabase)();
-        const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'seq_number', 'seq_assigned', 'sync_version', 'created_at', 'updated_at'];
+        const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'seq_number', 'seq_assigned', 'images', 'sync_version', 'created_at', 'updated_at'];
         for (const t of data) {
             try {
-                const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.seq_number || 0, t.seq_assigned || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()];
+                const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.seq_number || 0, t.seq_assigned || 0, t.images || '[]', t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()];
                 const existing = (0, database_js_1.queryOne)('SELECT id FROM tasks WHERE id = ?', [t.id]);
                 if (existing) {
                     (0, database_js_1.execute)(`UPDATE tasks SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, t.id]);
