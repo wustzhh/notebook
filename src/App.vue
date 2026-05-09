@@ -1,10 +1,8 @@
 <template>
-  <div class="app" :style="themeStore.backgroundImage ? { backgroundImage: 'url(' + themeStore.backgroundImage + ')', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : {}">
+  <div class="app">
     <AppSidebar />
-
     <div class="main-content">
       <TopBar />
-
       <div class="content-area">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
@@ -13,15 +11,13 @@
         </router-view>
       </div>
     </div>
-
-    <!-- 对话框 -->
     <TaskFormDialog />
     <ProjectFormDialog />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useProjectStore } from '@/stores/projectStore'
 import { useThemeStore } from '@/stores/themeStore'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
@@ -32,7 +28,29 @@ import ProjectFormDialog from '@/components/ProjectFormDialog.vue'
 const projectStore = useProjectStore()
 const themeStore = useThemeStore()
 
+function applyBg() {
+  const appEl = document.querySelector('.app') as HTMLElement
+  if (!appEl) return
+  if (themeStore.backgroundImage) {
+    appEl.style.backgroundImage = 'url(' + themeStore.backgroundImage + ')'
+    appEl.style.backgroundSize = 'cover'
+    appEl.style.backgroundPosition = 'center'
+    appEl.style.backgroundAttachment = 'fixed'
+    appEl.style.setProperty('--bg-secondary', 'transparent')
+    document.getElementById('app')?.classList.add('has-bg')
+  } else {
+    appEl.style.backgroundImage = ''
+    appEl.style.backgroundSize = ''
+    appEl.style.backgroundPosition = ''
+    appEl.style.backgroundAttachment = ''
+    appEl.style.removeProperty('--bg-secondary')
+    document.getElementById('app')?.classList.remove('has-bg')
+  }
+}
+
 onMounted(async () => {
+  applyBg()
+  watch(() => themeStore.backgroundImage, applyBg)
   await projectStore.loadProjects()
 })
 </script>
@@ -126,4 +144,14 @@ body {
 .fade-leave-to {
   opacity: 0;
 }
+
+#app.has-bg .content-area { background: transparent !important; position: relative; }
+#app.has-bg .content-area::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.96); z-index: -1; }
+.dark #app.has-bg .content-area::before { background: rgba(10,10,26,0.96); }
+#app.has-bg .kanban-column { background: rgba(255,255,255,0.85); }
+.dark #app.has-bg .kanban-column { background: rgba(10,10,26,0.85); }
+#app.has-bg .sidebar { background: rgba(7,71,166,0.85) !important; }
+.dark #app.has-bg .sidebar { background: rgba(10,10,26,0.9) !important; }
+#app.has-bg .board-view, #app.has-bg .kanban-board { background: transparent; }
+
 </style>

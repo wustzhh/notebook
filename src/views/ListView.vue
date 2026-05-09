@@ -137,8 +137,7 @@ onMounted(async () => {
 <style scoped>
 .list-view-wrapper {
   display: flex;
-  flex: 1;
-  min-height: 0;
+  height: calc(100vh - 140px);
   overflow: hidden;
 }
 

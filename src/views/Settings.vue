@@ -290,7 +290,7 @@ function formatTime(iso: string): string {
 </script>
 
 <style scoped>
-.settings-view { padding: 24px; max-width: 800px; }
+.settings-view { padding: 24px; }
 .card-header h2 { margin: 0; font-size: 20px; color: var(--text-primary); }
 .section { margin-bottom: 32px; }
 .section h3 { margin: 0 0 16px; font-size: 16px; color: var(--text-primary); }

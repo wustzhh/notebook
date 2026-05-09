@@ -32,8 +32,7 @@ onMounted(async () => {
 
 <style scoped>
 .board-view {
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   display: flex;
   overflow: hidden;
 }
@@ -55,8 +54,7 @@ onMounted(async () => {
 
 .board-wrapper {
   display: flex;
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   width: 100%;
   overflow: hidden;
 }
