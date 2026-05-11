@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import dayjs from 'dayjs'
 import { taskService } from '@/services/taskService'
 import { useProjectStore } from './projectStore'
 import type { Task, TaskStatus, TaskPriority, TaskCreateData, TaskUpdateData } from '@/types/task'
@@ -109,7 +110,7 @@ export const useTaskStore = defineStore('tasks', () => {
           registerRemoteId('tasks', result.ids[0])
           online = true
         } catch {
-          auth.forceLogout('服务器连接失败，已退出登录')
+          // genId 失败仅回退到本地 ID，不踢出登录
         }
       }
       if (!(data as any)._clientId) {
@@ -143,6 +144,15 @@ export const useTaskStore = defineStore('tasks', () => {
   async function updateTask(id: number, data: TaskUpdateData) {
     try {
       const oldTask = tasks.value.find(t => t.id === id)
+      if (oldTask && data.status !== undefined && data.status !== oldTask.status) {
+        const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+        if (oldTask.status === 'todo' && data.status !== 'todo' && !oldTask.start_date) {
+          ;(data as any).start_date = now
+        }
+        if (data.status === 'done' && !oldTask.end_date) {
+          ;(data as any).end_date = now
+        }
+      }
       const updatedTask = await taskService.update(id, data)
       tasks.value = tasks.value.map(t => t.id === id ? updatedTask : t)
 
@@ -296,6 +306,24 @@ export const useTaskStore = defineStore('tasks', () => {
       ]
       
       await taskService.reorder(allUpdates)
+
+      // 跨状态拖拽时，自动记录开始/完成时间
+      if (oldStatus !== newStatus) {
+        const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+        const dateUpdates: any = {}
+        if (oldStatus === 'todo' && !task.start_date) {
+          dateUpdates.start_date = now
+          task.start_date = now
+        }
+        if (newStatus === 'done' && !task.end_date) {
+          dateUpdates.end_date = now
+          task.end_date = now
+        }
+        if (Object.keys(dateUpdates).length > 0) {
+          await taskService.update(taskId, dateUpdates)
+        }
+      }
+
       for (const u of allUpdates) {
         const t = tasks.value.find(tt => tt.id === u.id)
         if (t) { (t as any).sync_version = 0; (t as any).updated_at = new Date().toISOString() }
@@ -319,7 +347,7 @@ export const useTaskStore = defineStore('tasks', () => {
   function getSubtasks(parentId: number): Task[] {
     return tasks.value
       .filter(t => t.parent_id === parentId)
-      .sort((a, b) => a.position - b.position)
+      .sort((a, b) => a.id - b.id)
   }
 
   // 获取某任务是否有子任务
@@ -360,7 +388,7 @@ export const useTaskStore = defineStore('tasks', () => {
           registerRemoteId('tasks', cid)
           online = true
         } catch {
-          auth.forceLogout('服务器连接失败，已退出登录')
+          // genId 失败仅回退到本地 ID，不踢出登录
         }
       }
       if (!cid) {
@@ -404,7 +432,12 @@ export const useTaskStore = defineStore('tasks', () => {
   async function toggleSubtaskDone(subtaskId: number, done: boolean) {
     try {
       const newStatus: TaskStatus = done ? 'done' : 'todo'
-      const updatedTask = await taskService.update(subtaskId, { status: newStatus })
+      const subtask = tasks.value.find(t => t.id === subtaskId)
+      const data: any = { status: newStatus }
+      if (done && subtask && !subtask.end_date) {
+        data.end_date = dayjs().format('YYYY-MM-DD HH:mm:ss')
+      }
+      const updatedTask = await taskService.update(subtaskId, data)
       // 使用数组替换，确保触发响应式更新
       tasks.value = tasks.value.map(t => t.id === subtaskId ? updatedTask : t)
       markDirty()

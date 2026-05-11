@@ -39,9 +39,9 @@ export const useLogStore = defineStore('logs', () => {
             const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'logs', 1)
             data._clientId = result.ids[0]
             registerRemoteId('logs', result.ids[0])
-          } catch {
-            auth.forceLogout('服务器连接失败，已退出登录')
-          }
+        } catch {
+          // genId 失败仅回退到本地 ID，不踢出登录
+        }
         }
         if (!data._clientId) {
           data._clientId = getNextLocalId('logs')

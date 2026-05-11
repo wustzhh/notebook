@@ -99,29 +99,6 @@ export const useSyncStore = defineStore('sync', () => {
         deleted_task_ids: [...taskStore.deletedTaskIds]
       })
 
-      if (result.projects) {
-        const pushedIds = new Set(dirtyProjects.map(p => p.id))
-        for (const sp of result.projects) {
-          if (!pushedIds.has(sp.id)) continue
-          const p = projectStore.projects.find(pp => pp.id === sp.id)
-          if (p) (p as any).sync_version = sp.sync_version
-        }
-      }
-      if (result.tasks) {
-        const pushedIds = new Set(dirtyTasks.map(t => t.id))
-        for (const st of result.tasks) {
-          if (!pushedIds.has(st.id)) continue
-          const t = taskStore.tasks.find(tt => tt.id === st.id)
-          if (t) {
-            (t as any).sync_version = st.sync_version
-            if (st.seq_assigned) {
-              ;(t as any).seq_number = st.seq_number
-              ;(t as any).seq_assigned = st.seq_assigned
-            }
-          }
-        }
-      }
-
       if (result.id_remap) {
         for (const [oldId, newId] of Object.entries(result.id_remap)) {
           const pid = Number(oldId)
@@ -132,6 +109,26 @@ export const useSyncStore = defineStore('sync', () => {
         }
       }
       if (result.id_remap) updateMaxFromRemap(result.id_remap)
+
+      // ID 重映射之后再用新 ID 匹配，确保 sync_version / seq_number 能正确更新
+      if (result.projects && result.projects.length > 0) {
+        for (const sp of result.projects) {
+          const p = projectStore.projects.find(pp => pp.id === sp.id)
+          if (!p) continue
+          if (sp.sync_version !== undefined) (p as any).sync_version = sp.sync_version
+        }
+      }
+      if (result.tasks && result.tasks.length > 0) {
+        for (const st of result.tasks) {
+          const t = taskStore.tasks.find(tt => tt.id === st.id)
+          if (!t) continue
+          if (st.sync_version !== undefined) (t as any).sync_version = st.sync_version
+          if (st.seq_assigned) {
+            ;(t as any).seq_number = st.seq_number
+            ;(t as any).seq_assigned = st.seq_assigned
+          }
+        }
+      }
 
       logStore.deletedCommentIds = []
       localStorage.removeItem('deleted_comment_ids')

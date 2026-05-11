@@ -83,38 +83,16 @@
         </div>
       </div>
 
-      <!-- 开始日期 (可编辑) - 仅父任务显示 -->
-      <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'start_date' }">
-        <label @click="startEdit('start_date')">开始日期</label>
-        <template v-if="editingField === 'start_date'">
-          <el-date-picker
-            v-model="editForm.start_date"
-            type="date"
-            placeholder="选择日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            @change="saveField('start_date')"
-            size="default"
-          />
-        </template>
-        <p v-else class="value clickable" @click="startEdit('start_date')">{{ task.start_date || '-' }}</p>
+      <!-- 开始日期 (只读，状态变更时自动记录) -->
+      <div v-if="!isSubtask" class="field-group">
+        <label>开始日期</label>
+        <p class="value">{{ task.start_date ? formatDateTime(task.start_date) : '未开始' }}</p>
       </div>
 
-      <!-- 截止日期 (可编辑) - 仅父任务显示 -->
-      <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'end_date' }">
-        <label @click="startEdit('end_date')">截止日期</label>
-        <template v-if="editingField === 'end_date'">
-          <el-date-picker
-            v-model="editForm.end_date"
-            type="date"
-            placeholder="选择日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            @change="saveField('end_date')"
-            size="default"
-          />
-        </template>
-        <p v-else class="value clickable" @click="startEdit('end_date')">{{ task.end_date || '-' }}</p>
+      <!-- 完成日期 (只读，完成时自动记录) -->
+      <div v-if="!isSubtask" class="field-group">
+        <label>完成日期</label>
+        <p class="value">{{ task.end_date ? formatDateTime(task.end_date) : '未完成' }}</p>
       </div>
 
       <!-- 描述 (可编辑) - 仅父任务显示 -->
@@ -357,7 +335,7 @@ const subtasks = computed(() => {
   if (!task.value) return []
   return taskStore.tasks
     .filter(t => t.parent_id === task.value!.id)
-    .sort((a, b) => a.position - b.position)
+    .sort((a, b) => a.id - b.id)
 })
 
 const subtaskProgress = computed(() => {
@@ -498,19 +476,17 @@ watch(previewImage, (val) => {
 onUnmounted(() => document.removeEventListener('keydown', handlePreviewEsc))
 
 function formatDateTime(date: string) {
-  return date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'
+  return date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'
 }
 
 function startEdit(field: string) {
   editingField.value = field
   // 初始化表单数据
-  editForm.value = {
+    editForm.value = {
     title: task.value!.title,
     description: task.value!.description,
     status: task.value!.status,
-    priority: task.value!.priority,
-    start_date: task.value!.start_date,
-    end_date: task.value!.end_date
+    priority: task.value!.priority
   }
 
   // 自动聚焦

@@ -65,7 +65,7 @@ export const useProjectStore = defineStore('projects', () => {
           registerRemoteId('projects', result.ids[0])
           online = true
         } catch {
-          auth.forceLogout('服务器连接失败，已退出登录')
+          // genId 失败仅回退到本地 ID，不踢出登录
         }
       }
       if (!(data as any)._clientId) {

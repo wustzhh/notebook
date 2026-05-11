@@ -64,34 +64,6 @@
         </el-col>
       </el-row>
 
-      <el-row :gutter="16">
-        <el-col :span="12">
-          <el-form-item label="开始日期">
-            <el-date-picker
-              v-model="formData.start_date"
-              type="date"
-              placeholder="选择日期"
-              style="width: 100%"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-            />
-          </el-form-item>
-        </el-col>
-
-        <el-col :span="12">
-          <el-form-item label="截止日期">
-            <el-date-picker
-              v-model="formData.end_date"
-              type="date"
-              placeholder="选择日期"
-              style="width: 100%"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-            />
-          </el-form-item>
-        </el-col>
-      </el-row>
-
       <el-form-item label="标签">
         <el-select
           v-model="formData.tagIds"
@@ -157,8 +129,6 @@ const formData = ref({
   parent_id: null as number | null,
   status: 'todo',
   priority: 'medium',
-  start_date: null as string | null,
-  end_date: null as string | null,
   tagIds: [] as number[]
 })
 
@@ -181,8 +151,6 @@ function resetForm() {
     parent_id: null,
     status: 'todo',
     priority: 'medium',
-    start_date: null,
-    end_date: null,
     tagIds: []
   }
   formRef.value?.clearValidate()
@@ -223,9 +191,7 @@ async function handleSubmit() {
         project_id: projectStore.currentProjectId,
         parent_id: formData.value.parent_id,
         status: formData.value.status,
-        priority: formData.value.priority,
-        start_date: formData.value.start_date,
-        end_date: formData.value.end_date
+        priority: formData.value.priority
       })
       if (newTask && resolvedTagIds.length > 0) {
         await tagStore.setTaskTags(newTask.id, resolvedTagIds)
