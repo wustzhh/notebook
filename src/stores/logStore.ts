@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { TaskLog } from '@/types/task'
 import { useAuthStore } from './authStore'
 import { getNextLocalId, registerRemoteId } from '@/utils/idManager'

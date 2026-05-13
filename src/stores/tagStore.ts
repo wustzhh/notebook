@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { Tag } from '@/types/tag'
 import { useProjectStore } from './projectStore'
 import { useAuthStore } from './authStore'
@@ -63,7 +64,7 @@ export const useTagStore = defineStore('tags', () => {
         try {
           const { useSyncStore } = await import('./syncStore')
           await useSyncStore().manualSync()
-        } catch (e: any) { console.warn('immediate sync failed:', e.message) }
+        } catch (e: any) { ElMessage.warning('自动同步失败，将在下次自动同步时重试') }
       }
 
       return tag

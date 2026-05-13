@@ -183,6 +183,11 @@ watch(() => props.task.id, () => {
   currentPage.value = 1
 })
 
+// 调试：监控 seq_assigned 变化
+watch(() => props.task.seq_assigned, (val) => {
+  console.log('[KanbanCard] task', props.task.id, 'seq_assigned changed to:', val, 'seq_number:', props.task.seq_number)
+}, { immediate: true })
+
 // 切换子任务完成状态
 async function toggleSubtaskDone(subtaskId: number, done: boolean) {
   try {

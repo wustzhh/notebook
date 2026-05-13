@@ -19,6 +19,8 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
 import { useProjectStore } from '@/stores/projectStore'
+import { useAuthStore } from '@/stores/authStore'
+import { useSyncStore } from '@/stores/syncStore'
 import { useThemeStore } from '@/stores/themeStore'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import TopBar from '@/components/layout/TopBar.vue'
@@ -26,6 +28,8 @@ import TaskFormDialog from '@/components/TaskFormDialog.vue'
 import ProjectFormDialog from '@/components/ProjectFormDialog.vue'
 
 const projectStore = useProjectStore()
+const authStore = useAuthStore()
+const syncStore = useSyncStore()
 const themeStore = useThemeStore()
 
 function applyBg() {
@@ -51,6 +55,12 @@ function applyBg() {
 onMounted(async () => {
   applyBg()
   watch(() => themeStore.backgroundImage, applyBg)
+  // 恢复登录状态
+  await authStore.loadFromStorage()
+  if (authStore.isLoggedIn) {
+    await authStore.checkAndRefreshToken()
+    syncStore.startAutoSync()
+  }
   await projectStore.loadProjects()
 })
 </script>

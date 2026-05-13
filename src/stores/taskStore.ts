@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import dayjs from 'dayjs'
+import { ElMessage } from 'element-plus'
 import { taskService } from '@/services/taskService'
 import { useProjectStore } from './projectStore'
 import type { Task, TaskStatus, TaskPriority, TaskCreateData, TaskUpdateData } from '@/types/task'
@@ -103,14 +104,16 @@ export const useTaskStore = defineStore('tasks', () => {
     try {
       const auth = useAuthStore()
       let online = false
+      console.log('[createTask] serverUrl:', !!auth.serverUrl, 'token:', !!auth.token, 'serverUrl_val:', auth.serverUrl)
       if (auth.serverUrl && auth.token) {
         try {
           const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
           ;(data as any)._clientId = result.ids[0]
           registerRemoteId('tasks', result.ids[0])
           online = true
-        } catch {
-          // genId 失败仅回退到本地 ID，不踢出登录
+          console.log('[createTask] genId SUCCESS, server_id:', result.ids[0])
+        } catch (e: any) {
+          console.log('[createTask] genId FAILED:', e.message)
         }
       }
       if (!(data as any)._clientId) {
@@ -125,12 +128,15 @@ export const useTaskStore = defineStore('tasks', () => {
       logChange(newTask.id, { task_id: newTask.id, type: 'created', content: '创建了任务' })
       markDirty()
 
+      console.log('[createTask] online:', online, 'will call manualSync')
       // 在线时立即推送获取 seq_number
       if (online) {
         try {
           const { useSyncStore } = await import('./syncStore')
+          console.log('[createTask] calling manualSync...')
           await useSyncStore().manualSync()
-        } catch (e: any) { console.warn('immediate sync failed:', e.message) }
+          console.log('[createTask] manualSync done')
+        } catch (e: any) { ElMessage.warning('自动同步失败，将在下次自动同步时重试') }
       }
 
       return newTask
@@ -417,7 +423,7 @@ export const useTaskStore = defineStore('tasks', () => {
         try {
           const { useSyncStore } = await import('./syncStore')
           await useSyncStore().manualSync()
-        } catch (e: any) { console.warn('immediate sync failed:', e.message) }
+        } catch (e: any) { ElMessage.warning('自动同步失败，将在下次自动同步时重试') }
       }
 
       return newTask
