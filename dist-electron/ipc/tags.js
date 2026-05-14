@@ -36,6 +36,9 @@ function registerTagHandlers(mainWindow) {
             }
             else if (data._clientId) {
                 id = data._clientId;
+                if ((0, database_js_1.queryOne)('SELECT 1 FROM tags WHERE id = ?', [id])) {
+                    id = (0, database_js_1.generateId)();
+                }
             }
             else {
                 id = (0, database_js_1.generateId)();

@@ -55,14 +55,18 @@ function registerTaskHandlers(mainWindow) {
             }
             else if (taskData._clientId) {
                 id = taskData._clientId;
-                (0, database_js_1.execute)(`INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+                // 如果本地已存在该 ID，换用 generateId 避免覆盖已有数据
+                if ((0, database_js_1.queryOne)('SELECT 1 FROM tasks WHERE id = ?', [id])) {
+                    id = (0, database_js_1.generateId)();
+                }
+                (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
                     taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
                     newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']);
             }
             else {
                 id = (0, database_js_1.generateId)();
-                (0, database_js_1.execute)(`INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+                (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
                     taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
                     newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']);

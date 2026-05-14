@@ -36,6 +36,9 @@ export function registerTagHandlers(mainWindow: BrowserWindow) {
         id = data._remoteId
       } else if (data._clientId) {
         id = data._clientId
+        if (queryOne('SELECT 1 FROM tags WHERE id = ?', [id])) {
+          id = generateId()
+        }
       } else {
         id = generateId()
       }

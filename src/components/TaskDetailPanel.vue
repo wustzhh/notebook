@@ -8,7 +8,7 @@
       <el-button text :icon="Close" @click="handleClose" />
     </div>
 
-    <div class="panel-body" v-if="activeTab === 'detail'">
+    <div class="panel-body" v-if="activeTab === 'detail'" @click.self="handlePanelBodyClick">
       <!-- ID (只读) -->
       <div class="field-group">
         <label>ID</label>
@@ -102,8 +102,8 @@
           <textarea
             ref="descTextareaRef"
             v-model="editForm.description"
-            :rows="4"
             class="desc-textarea"
+            @input="autoResizeTextarea"
             @blur="saveField('description')"
             @paste="handleDescPaste"
           ></textarea>
@@ -440,7 +440,6 @@ const newSubtaskTitle = ref('')
 const subtaskInputRef = ref()
 
 const titleInputRef = ref()
-const descInputRef = ref()
 
 // 监听任务切换，重置编辑状态
 watch(task, () => {
@@ -493,10 +492,31 @@ function startEdit(field: string) {
   nextTick(() => {
     if (field === 'title' && titleInputRef.value) {
       titleInputRef.value.focus()
-    } else if (field === 'description' && descInputRef.value) {
-      descInputRef.value.focus()
+    } else if (field === 'description' && descTextareaRef.value) {
+      descTextareaRef.value.focus()
+      autoResizeTextarea()
+      nextTick(() => smartScrollToDescription())
     }
   })
+}
+
+function autoResizeTextarea() {
+  const el = descTextareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
+function smartScrollToDescription() {
+  const el = descTextareaRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const viewH = window.innerHeight
+  if (rect.height <= viewH) {
+    el.scrollIntoView({ block: 'end', behavior: 'smooth' })
+  } else {
+    el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }
 }
 
 async function saveField(field: string) {
@@ -527,6 +547,12 @@ async function saveField(field: string) {
 
 function handleClose() {
   uiStore.closeTaskDetail()
+}
+
+function handlePanelBodyClick() {
+  if (editingField.value) {
+    saveField(editingField.value)
+  }
 }
 
 async function handleDelete() {
@@ -839,6 +865,6 @@ function openParentTask() {
 
 .image-preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; }
 .image-preview-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
-.desc-textarea { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: vertical; font-size: 13px; background: var(--bg-primary); color: var(--text-primary); }
+.desc-textarea { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: none; font-size: 13px; background: var(--bg-primary); color: var(--text-primary); min-height: 80px; overflow-y: hidden; }
 .comment-textarea { flex: 1; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: none; font-size: 13px; background: var(--bg-primary); color: var(--text-primary); }
 </style>

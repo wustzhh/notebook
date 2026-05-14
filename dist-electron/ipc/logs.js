@@ -23,6 +23,9 @@ function registerLogHandlers() {
             }
             else if (data._clientId) {
                 id = data._clientId;
+                if ((0, database_js_1.queryOne)('SELECT 1 FROM task_logs WHERE id = ?', [id])) {
+                    id = (0, database_js_1.generateId)();
+                }
             }
             else if (data.id) {
                 id = data.id;

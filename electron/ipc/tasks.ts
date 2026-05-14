@@ -60,8 +60,12 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
         )
       } else if (taskData._clientId) {
         id = taskData._clientId
+        // 如果本地已存在该 ID，换用 generateId 避免覆盖已有数据
+        if (queryOne('SELECT 1 FROM tasks WHERE id = ?', [id])) {
+          id = generateId()
+        }
         execute(
-          `INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
            taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
@@ -70,7 +74,7 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
       } else {
         id = generateId()
         execute(
-          `INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
            taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,

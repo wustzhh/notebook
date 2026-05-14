@@ -35,11 +35,14 @@ export function registerProjectHandlers(mainWindow: BrowserWindow) {
       if (projectData._remoteId) {
         id = projectData._remoteId
         execute(
-          'INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)',
+          'INSERT OR REPLACE INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)',
           [projectData._remoteId, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
         )
       } else if (projectData._clientId) {
         id = projectData._clientId
+        if (queryOne('SELECT 1 FROM projects WHERE id = ?', [id])) {
+          id = generateId()
+        }
         execute(
           'INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)',
           [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']
