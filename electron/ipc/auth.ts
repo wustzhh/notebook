@@ -1,4 +1,4 @@
-import { ipcMain, safeStorage } from 'electron'
+import { ipcMain } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import { app } from 'electron'
@@ -6,33 +6,32 @@ import { app } from 'electron'
 const TOKEN_PATH = path.join(app.getPath('userData'), '.auth_token')
 const CRED_PATH = path.join(app.getPath('userData'), '.auth_cred')
 
+function safeWrite(filePath: string, data: string) {
+  try {
+    fs.writeFileSync(filePath, data, 'utf-8')
+  } catch (e) {
+    console.error('Write file error:', filePath, e)
+    throw e
+  }
+}
+
+function safeRead(filePath: string): string | null {
+  try {
+    if (!fs.existsSync(filePath)) return null
+    return fs.readFileSync(filePath, 'utf-8')
+  } catch (e) {
+    console.error('Read file error:', filePath, e)
+    return null
+  }
+}
+
 export function registerAuthHandlers() {
   ipcMain.handle('auth:save-token', async (_event, token: string) => {
-    try {
-      if (safeStorage.isEncryptionAvailable()) {
-        const encrypted = safeStorage.encryptString(token)
-        fs.writeFileSync(TOKEN_PATH, encrypted)
-      } else {
-        fs.writeFileSync(TOKEN_PATH, token, 'utf-8')
-      }
-    } catch (e) {
-      console.error('Save token error:', e)
-      throw e
-    }
+    safeWrite(TOKEN_PATH, token)
   })
 
   ipcMain.handle('auth:get-token', async () => {
-    try {
-      if (!fs.existsSync(TOKEN_PATH)) return null
-      const data = fs.readFileSync(TOKEN_PATH)
-      if (safeStorage.isEncryptionAvailable()) {
-        return safeStorage.decryptString(data)
-      }
-      return data.toString('utf-8')
-    } catch (e) {
-      console.error('Get token error:', e)
-      return null
-    }
+    return safeRead(TOKEN_PATH)
   })
 
   ipcMain.handle('auth:clear-token', async () => {
@@ -45,33 +44,15 @@ export function registerAuthHandlers() {
   })
 
   ipcMain.handle('auth:save-credentials', async (_event, email: string, password: string) => {
-    try {
-      const data = JSON.stringify({ email, password })
-      if (safeStorage.isEncryptionAvailable()) {
-        const encrypted = safeStorage.encryptString(data)
-        fs.writeFileSync(CRED_PATH, encrypted)
-      } else {
-        fs.writeFileSync(CRED_PATH, data, 'utf-8')
-      }
-    } catch (e) {
-      console.error('Save credentials error:', e)
-      throw e
-    }
+    safeWrite(CRED_PATH, JSON.stringify({ email, password }))
   })
 
   ipcMain.handle('auth:get-credentials', async () => {
+    const raw = safeRead(CRED_PATH)
+    if (!raw) return null
     try {
-      if (!fs.existsSync(CRED_PATH)) return null
-      const data = fs.readFileSync(CRED_PATH)
-      let raw: string
-      if (safeStorage.isEncryptionAvailable()) {
-        raw = safeStorage.decryptString(data)
-      } else {
-        raw = data.toString('utf-8')
-      }
       return JSON.parse(raw) as { email: string; password: string }
-    } catch (e) {
-      console.error('Get credentials error:', e)
+    } catch {
       return null
     }
   })

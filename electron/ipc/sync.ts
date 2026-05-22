@@ -1,15 +1,18 @@
 import { ipcMain } from 'electron'
+import { setConfig } from './serverConfig.js'
+
+let baseUrl = ''
+let authToken = ''
 
 export function registerSyncHandlers() {
-  let baseUrl = ''
-  let authToken = ''
-
   ipcMain.handle('sync:configure', async (_event, serverUrl: string, token: string) => {
     baseUrl = serverUrl
     authToken = token
+    setConfig(serverUrl, token)
   })
 
   ipcMain.handle('sync:push', async (_event, serverUrl: string, token: string, data: any) => {
+    console.log('[sync:push IPC] called, url:', !!serverUrl, 'token:', !!token, 'tasks:', data?.tasks?.length)
     const url = serverUrl || baseUrl
     const t = token || authToken
     if (!url || !t) throw new Error('未配置同步服务器')
@@ -82,5 +85,21 @@ export function registerSyncHandlers() {
 
   ipcMain.handle('sync:get-last-time', async () => {
     return ''
+  })
+
+  ipcMain.handle('sync:gen-id', async (_event, serverUrl: string, token: string, entity: string, count: number) => {
+    const url = serverUrl || baseUrl
+    const t = token || authToken
+    if (!url || !t) throw new Error('未配置同步服务器')
+    const response = await fetch(`${url}/sync/gen-id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${t}`
+      },
+      body: JSON.stringify({ entity, count })
+    })
+    if (!response.ok) throw new Error('获取ID失败')
+    return await response.json()
   })
 }

@@ -93,8 +93,6 @@ function handleDrop(event: DragEvent) {
 
 <style scoped>
 .kanban-column {
-  background: var(--bg-secondary);
-  border-radius: 6px;
   display: flex;
   flex-direction: column;
   max-height: 100%;

@@ -9,7 +9,11 @@
         stripe
         @row-click="handleRowClick"
       >
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="标识" width="100">
+          <template #default="{ row }">
+            <span class="task-key-id">{{ row.project_key }}-{{ row.seq_assigned ? row.seq_number : '?' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="title" label="标题" min-width="200">
           <template #default="{ row }">
             <span class="task-title">{{ row.title }}</span>

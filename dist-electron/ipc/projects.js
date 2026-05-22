@@ -34,8 +34,15 @@ function registerProjectHandlers(mainWindow) {
             await (0, database_js_1.initDatabase)();
             let id;
             if (projectData._remoteId) {
-                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [projectData._remoteId, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
                 id = projectData._remoteId;
+                (0, database_js_1.execute)('INSERT OR REPLACE INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [projectData._remoteId, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
+            }
+            else if (projectData._clientId) {
+                id = projectData._clientId;
+                if ((0, database_js_1.queryOne)('SELECT 1 FROM projects WHERE id = ?', [id])) {
+                    id = (0, database_js_1.generateId)();
+                }
+                (0, database_js_1.execute)('INSERT INTO projects (id, name, key, color, description) VALUES (?, ?, ?, ?, ?)', [id, projectData.name, projectData.key, projectData.color || '#4A90D9', projectData.description || '']);
             }
             else {
                 id = (0, database_js_1.generateId)();
@@ -78,7 +85,8 @@ function registerProjectHandlers(mainWindow) {
                 values.push(data.status);
             }
             fields.push('sync_version = 0');
-            fields.push('updated_at = CURRENT_TIMESTAMP');
+            fields.push('updated_at = ?');
+            values.push(new Date().toISOString());
             values.push(id);
             (0, database_js_1.execute)(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);
             const updatedProject = (0, database_js_1.queryOne)('SELECT * FROM projects WHERE id = ?', [id]);
@@ -99,6 +107,10 @@ function registerProjectHandlers(mainWindow) {
     electron_1.ipcMain.handle('projects:delete', async (_event, id) => {
         try {
             await (0, database_js_1.initDatabase)();
+            (0, database_js_1.execute)('DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)', [id]);
+            (0, database_js_1.execute)('DELETE FROM task_tags WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?)', [id]);
+            (0, database_js_1.execute)('DELETE FROM tasks WHERE project_id = ?', [id]);
+            (0, database_js_1.execute)('DELETE FROM tags WHERE project_id = ?', [id]);
             (0, database_js_1.execute)('DELETE FROM projects WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('project-deleted', id);

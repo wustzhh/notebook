@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { initDatabase, queryAll, queryOne, execute } from '../database.js'
+import { initDatabase, queryAll, queryOne, execute, generateId } from '../database.js'
 
 export function registerTagHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle('tags:get-by-project', async (_event, projectId: number) => {
@@ -30,9 +30,22 @@ export function registerTagHandlers(mainWindow: BrowserWindow) {
       await initDatabase()
       const existing = queryOne('SELECT * FROM tags WHERE name = ? AND project_id = ?', [data.name, data.project_id])
       if (existing) return existing
-      const id = execute(
-        'INSERT INTO tags (name, color, project_id) VALUES (?, ?, ?)',
-        [data.name, data.color || '#409EFF', data.project_id]
+
+      let id: number
+      if (data._remoteId) {
+        id = data._remoteId
+      } else if (data._clientId) {
+        id = data._clientId
+        if (queryOne('SELECT 1 FROM tags WHERE id = ?', [id])) {
+          id = generateId()
+        }
+      } else {
+        id = generateId()
+      }
+
+      execute(
+        'INSERT INTO tags (id, name, color, project_id) VALUES (?, ?, ?, ?)',
+        [id, data.name, data.color || '#409EFF', data.project_id]
       )
       const tag = queryOne('SELECT * FROM tags WHERE id = ?', [id])
       mainWindow.webContents.send('tag-created', tag)

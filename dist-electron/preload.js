@@ -53,7 +53,8 @@ const syncAPI = {
     pull: (serverUrl, token, since) => electron_1.ipcRenderer.invoke('sync:pull', serverUrl, token, since),
     full: (serverUrl, token) => electron_1.ipcRenderer.invoke('sync:full', serverUrl, token),
     health: (serverUrl) => electron_1.ipcRenderer.invoke('sync:health', serverUrl),
-    getLastTime: () => electron_1.ipcRenderer.invoke('sync:get-last-time')
+    getLastTime: () => electron_1.ipcRenderer.invoke('sync:get-last-time'),
+    genId: (serverUrl, token, entity, count) => electron_1.ipcRenderer.invoke('sync:gen-id', serverUrl, token, entity, count)
 };
 electron_1.contextBridge.exposeInMainWorld('authAPI', authAPI);
 electron_1.contextBridge.exposeInMainWorld('syncAPI', syncAPI);

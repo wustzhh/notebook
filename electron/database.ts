@@ -46,24 +46,10 @@ function createTables() {
   `)
 
   // 兼容旧数据库：添加 status 列（如果不存在）
-  try {
-    db.run("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'active'")
-  } catch (e) {
-    // 列已存在，忽略错误
-  }
+  try { db.run("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'active'") } catch { /* 列已存在 */ }
 
   // 兼容旧数据库：添加 sync_version 列（如果不存在）
-  try {
-    db.run("ALTER TABLE projects ADD COLUMN sync_version INTEGER DEFAULT 0")
-  } catch (e) {
-    // 列已存在，忽略错误
-  }
-
-  try {
-    db.run("ALTER TABLE tasks ADD COLUMN sync_version INTEGER DEFAULT 0")
-  } catch (e) {
-    // 列已存在，忽略错误
-  }
+  try { db.run("ALTER TABLE projects ADD COLUMN sync_version INTEGER DEFAULT 0") } catch { /* 列已存在 */ }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS tasks (
@@ -77,6 +63,9 @@ function createTables() {
       start_date TEXT,
       end_date TEXT,
       position INTEGER DEFAULT 0,
+      seq_number INTEGER DEFAULT 0,
+      seq_assigned INTEGER DEFAULT 0,
+      images TEXT DEFAULT '[]',
       sync_version INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -84,6 +73,13 @@ function createTables() {
       FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE
     )
   `)
+
+  try { db.run("ALTER TABLE tasks ADD COLUMN sync_version INTEGER DEFAULT 0") } catch { /* 列已存在 */ }
+
+  try { db.run("ALTER TABLE tasks ADD COLUMN seq_number INTEGER DEFAULT 0") } catch { /* 列已存在 */ }
+  try { db.run("ALTER TABLE tasks ADD COLUMN seq_assigned INTEGER DEFAULT 0") } catch { /* 列已存在 */ }
+
+  try { db.run("ALTER TABLE tasks ADD COLUMN images TEXT DEFAULT '[]'") } catch { /* 列已存在 */ }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS tags (
@@ -114,15 +110,27 @@ function createTables() {
       old_value TEXT,
       new_value TEXT,
       field TEXT,
+      images TEXT DEFAULT '[]',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
     )
   `)
 
+  try { db.run("ALTER TABLE task_logs ADD COLUMN images TEXT DEFAULT '[]'") } catch { /* 列已存在 */ }
+
   // 创建索引以提升查询性能
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)')
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)')
   db.run('CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_id)')
+
+  // 清理孤儿数据
+  try {
+    db.run("DELETE FROM task_logs WHERE task_id NOT IN (SELECT id FROM tasks)")
+    db.run("DELETE FROM task_tags WHERE task_id NOT IN (SELECT id FROM tasks)")
+    db.run("DELETE FROM task_tags WHERE tag_id NOT IN (SELECT id FROM tags)")
+    db.run("DELETE FROM tags WHERE project_id NOT IN (SELECT id FROM projects)")
+    db.run("DELETE FROM tasks WHERE project_id NOT IN (SELECT id FROM projects)")
+  } catch { /* ignore */ }
 
   // 清理重复标签
   try {

@@ -15,7 +15,7 @@
 
     <div class="card-content" @click="handleClick">
       <div class="card-header">
-        <span class="task-key">{{ task.project_key }}-{{ task.id }}</span>
+        <span class="task-key">{{ task.project_key }}-{{ task.seq_assigned ? task.seq_number : '?' }}</span>
         <span class="header-right">
           <span v-if="cc > 0" class="comment-count">💬 {{ cc }}</span>
           <PriorityBadge :priority="task.priority" />
@@ -72,7 +72,7 @@
             @change="(val) => toggleSubtaskDone(subtask.id, val as boolean)"
             @click.stop
           />
-          <span class="subtask-key">{{ task.project_key }}-{{ subtask.id }}</span>
+          <span class="subtask-key">{{ subtask.project_key }}-{{ subtask.seq_assigned ? subtask.seq_number : '?' }}</span>
           <span class="subtask-title">{{ subtask.title }}</span>
         </div>
       </div>
@@ -159,11 +159,11 @@ const cardMatchType = computed((): 'tag' | 'comment' | null => {
 
 const cc = computed(() => logStore.commentCount(props.task.id))
 
-// 所有子任务（按 position 排序）
+// 所有子任务（按 id 排序，即创建顺序）
 const allSubtasks = computed(() => 
   taskStore.tasks
     .filter(t => t.parent_id === props.task.id)
-    .sort((a, b) => a.position - b.position)
+    .sort((a, b) => a.id - b.id)
 )
 
 // 总页数
@@ -182,6 +182,11 @@ const paginatedSubtasks = computed(() => {
 watch(() => props.task.id, () => {
   currentPage.value = 1
 })
+
+// 调试：监控 seq_assigned 变化
+watch(() => props.task.seq_assigned, (val) => {
+  console.log('[KanbanCard] task', props.task.id, 'seq_assigned changed to:', val, 'seq_number:', props.task.seq_number)
+}, { immediate: true })
 
 // 切换子任务完成状态
 async function toggleSubtaskDone(subtaskId: number, done: boolean) {
@@ -233,6 +238,7 @@ function formatDate(date: string) {
   box-shadow: 0 1px 2px var(--shadow);
   border: 2px solid transparent;
   display: flex;
+  max-width: 100%;
   overflow: hidden;
   transition: background-color 0.3s ease, box-shadow 0.3s ease, opacity 0.2s ease;
   user-select: none;
@@ -271,18 +277,22 @@ function formatDate(date: string) {
 
 .card-content {
   flex: 1;
+  min-width: 0;
   padding: 12px;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
+  overflow: hidden;
 }
 
-.header-right { display: flex; align-items: center; gap: 6px; }
+.header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .comment-count { font-size: 11px; color: var(--text-tertiary); }
 
 .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
@@ -295,6 +305,11 @@ function formatDate(date: string) {
   font-size: 11px;
   color: var(--text-secondary);
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  flex-shrink: 0;
   transition: color 0.3s ease;
 }
 
@@ -304,6 +319,9 @@ function formatDate(date: string) {
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: color 0.3s ease;
 }
 
@@ -325,6 +343,7 @@ function formatDate(date: string) {
   padding: 8px 0;
   border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
   transition: border-color 0.3s ease;
 }
 
@@ -335,6 +354,7 @@ function formatDate(date: string) {
   padding: 6px 8px;
   margin: 2px 0;
   border-radius: 4px;
+  overflow: hidden;
   transition: background 0.15s;
 }
 
@@ -352,18 +372,26 @@ function formatDate(date: string) {
   font-size: 10px;
   color: var(--text-tertiary);
   white-space: nowrap;
-  min-width: 35px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60px;
+  flex-shrink: 0;
   transition: color 0.3s ease;
 }
 
 .subtask-title {
   flex: 1;
+  min-width: 0;
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-primary);
   transition: color 0.3s ease;
+}
+
+.subtask-item :deep(.el-checkbox) {
+  flex-shrink: 0;
 }
 
 /* 分页控制 */
@@ -388,6 +416,7 @@ function formatDate(date: string) {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  overflow: hidden;
 }
 
 .subtask-progress {

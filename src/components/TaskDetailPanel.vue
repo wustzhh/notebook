@@ -8,18 +8,18 @@
       <el-button text :icon="Close" @click="handleClose" />
     </div>
 
-    <div class="panel-body" v-if="activeTab === 'detail'">
+    <div class="panel-body" v-if="activeTab === 'detail'" @click.self="handlePanelBodyClick">
       <!-- ID (只读) -->
       <div class="field-group">
         <label>ID</label>
-        <p class="value">{{ task.project_key }}-{{ task.id }}</p>
+        <p class="value">{{ task.project_key }}-{{ task.seq_assigned ? task.seq_number : '?' }}</p>
       </div>
 
       <!-- 父任务信息 -->
       <div v-if="task.parent_id" class="field-group">
         <label>父任务</label>
         <p class="value parent-link clickable" @click="openParentTask">
-          {{ parentTask?.project_key }}-{{ parentTask?.id }} {{ parentTask?.title }}
+          {{ parentTask.project_key }}-{{ parentTask.seq_assigned ? parentTask.seq_number : '?' }} {{ parentTask.title }}
         </p>
       </div>
 
@@ -83,56 +83,45 @@
         </div>
       </div>
 
-      <!-- 开始日期 (可编辑) - 仅父任务显示 -->
-      <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'start_date' }">
-        <label @click="startEdit('start_date')">开始日期</label>
-        <template v-if="editingField === 'start_date'">
-          <el-date-picker
-            v-model="editForm.start_date"
-            type="date"
-            placeholder="选择日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            @change="saveField('start_date')"
-            size="default"
-          />
-        </template>
-        <p v-else class="value clickable" @click="startEdit('start_date')">{{ task.start_date || '-' }}</p>
+      <!-- 开始日期 (只读，状态变更时自动记录) -->
+      <div v-if="!isSubtask" class="field-group">
+        <label>开始日期</label>
+        <p class="value">{{ task.start_date ? formatDateTime(task.start_date) : '未开始' }}</p>
       </div>
 
-      <!-- 截止日期 (可编辑) - 仅父任务显示 -->
-      <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'end_date' }">
-        <label @click="startEdit('end_date')">截止日期</label>
-        <template v-if="editingField === 'end_date'">
-          <el-date-picker
-            v-model="editForm.end_date"
-            type="date"
-            placeholder="选择日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            @change="saveField('end_date')"
-            size="default"
-          />
-        </template>
-        <p v-else class="value clickable" @click="startEdit('end_date')">{{ task.end_date || '-' }}</p>
+      <!-- 完成日期 (只读，完成时自动记录) -->
+      <div v-if="!isSubtask" class="field-group">
+        <label>完成日期</label>
+        <p class="value">{{ task.end_date ? formatDateTime(task.end_date) : '未完成' }}</p>
       </div>
 
       <!-- 描述 (可编辑) - 仅父任务显示 -->
       <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'description' }">
         <label @click="startEdit('description')">描述</label>
         <template v-if="editingField === 'description'">
-          <el-input
-            ref="descInputRef"
+          <textarea
+            ref="descTextareaRef"
             v-model="editForm.description"
-            type="textarea"
-            :rows="4"
+            class="desc-textarea"
+            @input="autoResizeTextarea"
             @blur="saveField('description')"
-            size="default"
-          />
+            @paste="handleDescPaste"
+          ></textarea>
+          <div class="image-list">
+            <div v-for="(img, i) in descImages" :key="i" class="image-item">
+              <img :src="img.data" @click="previewImage = img.data" />
+              <span class="image-remove" @click="descImages.splice(i, 1)">×</span>
+            </div>
+          </div>
+          <el-button size="small" @click="triggerImageInput('desc')">插入图片</el-button>
+          <input ref="descImageInput" type="file" accept="image/*" multiple style="display:none" @change="(e) => handleImageFilesForDesc(e)" />
         </template>
-        <p v-else class="value description clickable" @click="startEdit('description')">
-          {{ task.description || '暂无描述' }}
-        </p>
+        <div v-else class="value description clickable" @click="startEdit('description')">
+          <p>{{ task.description || '暂无描述' }}</p>
+          <div v-if="descReadImages.length > 0" class="image-list readonly">
+            <img v-for="(img, i) in descReadImages" :key="i" :src="img.data" class="image-thumb" @click.stop="previewImage = img.data" />
+          </div>
+        </div>
       </div>
 
       <!-- 子任务区域 - 仅父任务显示 -->
@@ -154,8 +143,8 @@
               :model-value="subtask.status === 'done'"
               @change="(val) => toggleSubtaskDone(subtask.id, val as boolean)"
             />
-            <span class="subtask-key">{{ task.project_key }}-{{ subtask.id }}</span>
-            <span class="subtask-title" @click="openSubtaskDetail(subtask.id)">{{ subtask.title }}</span>
+            <span class="subtask-key">{{ task.project_key }}-{{ subtask.seq_assigned ? subtask.seq_number : '?' }}</span>
+            <span class="subtask-title">{{ subtask.title }}</span>
             <StatusTag :status="subtask.status" size="small" />
           </div>
         </div>
@@ -214,15 +203,25 @@
           <el-input v-model="editingLogContent" size="small" @blur="saveEditLog(log)" @keyup.enter="saveEditLog(log)" />
         </template>
         <span v-else class="log-content" @dblclick="startEditLog(log)">{{ log.content }}</span>
+        <div v-if="log.images" class="log-images">
+          <img v-for="(img, i) in parseLogImages(log.images)" :key="i" :src="img.data" class="image-thumb" @click="previewImage = img.data" />
+        </div>
         <span v-if="log.type === 'comment'" class="log-type-badge comment">评论</span>
         <el-button v-if="log.type === 'comment'" link size="small" class="log-delete" @click="handleDeleteLog(log)"><el-icon><Close /></el-icon></el-button>
       </div>
       <div class="comment-box">
-        <el-input v-model="commentText" placeholder="添加评论..." size="small" @keyup.enter="sendComment">
-          <template #suffix>
-            <el-button text size="small" @click="sendComment">发送</el-button>
-          </template>
-        </el-input>
+        <div class="comment-image-list" v-if="commentImages.length > 0">
+          <div v-for="(img, i) in commentImages" :key="i" class="image-item small">
+            <img :src="img.data" />
+            <span class="image-remove" @click="commentImages.splice(i, 1)">×</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <textarea v-model="commentText" placeholder="添加评论..." class="comment-textarea" @keyup.enter="sendComment" @paste="handleCommentPaste" rows="1"></textarea>
+          <el-button size="small" @click="triggerImageInput('comment')">📷</el-button>
+          <el-button size="small" type="primary" @click="sendComment">发送</el-button>
+        </div>
+        <input ref="commentImageInput" type="file" accept="image/*" multiple style="display:none" @change="(e) => handleImageFilesForComment(e)" />
       </div>
     </div>
 
@@ -233,11 +232,16 @@
         </template>
       </el-popconfirm>
     </div>
+
+    <!-- 图片预览遮罩 -->
+    <div v-if="previewImage" class="image-preview-overlay" @click="previewImage = null">
+      <img :src="previewImage" @click.stop />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, onUnmounted } from 'vue'
 import dayjs from 'dayjs'
 import { Close, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -248,6 +252,7 @@ import { useLogStore } from '@/stores/logStore'
 import StatusTag from '@/components/common/StatusTag.vue'
 import PriorityBadge from '@/components/common/PriorityBadge.vue'
 import type { Task } from '@/types/task'
+import { parseImages, handleImagePaste, handleImageFiles, ImageItem } from '@/utils/imageUtils'
 
 const uiStore = useUIStore()
 const taskStore = useTaskStore()
@@ -262,13 +267,75 @@ const logLoading = ref(false)
 const newTagIds = ref<number[]>([])
 const editingLogId = ref<number | null>(null)
 const editingLogContent = ref('')
+const previewImage = ref<string | null>(null)
+const descImages = ref<ImageItem[]>([])
+const commentImages = ref<ImageItem[]>([])
+const descImageInput = ref<HTMLInputElement | null>(null)
+const commentImageInput = ref<HTMLInputElement | null>(null)
+const descTextareaRef = ref<HTMLTextAreaElement | null>(null)
+
+const descReadImages = computed(() => task.value ? parseImages((task.value as any).images) : [])
+function parseLogImages(raw: string) { return parseImages(raw) }
+
+async function handleDescPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  let hasImage = false
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith('image/')) { hasImage = true; break }
+  }
+  if (hasImage) {
+    e.preventDefault()
+    const result = await handleImagePaste(e, descImages.value)
+    descImages.value = result.images
+  }
+}
+
+async function handleDescDrop(e: DragEvent) {
+  if (e.dataTransfer?.files) {
+    descImages.value = await handleImageFiles(e.dataTransfer.files, descImages.value)
+  }
+}
+
+async function handleCommentPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  let hasImage = false
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith('image/')) { hasImage = true; break }
+  }
+  if (hasImage) {
+    e.preventDefault()
+    const result = await handleImagePaste(e, commentImages.value)
+    commentImages.value = result.images
+  }
+}
+
+function triggerImageInput(type: 'desc' | 'comment') {
+  if (type === 'desc') descImageInput.value?.click()
+  else commentImageInput.value?.click()
+}
+
+async function handleImageFilesForDesc(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files) {
+    descImages.value = await handleImageFiles(input.files, descImages.value)
+  }
+}
+
+async function handleImageFilesForComment(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files) {
+    commentImages.value = await handleImageFiles(input.files, commentImages.value)
+  }
+}
 
 // 直接访问 taskStore.tasks 以确保响应式追踪
 const subtasks = computed(() => {
   if (!task.value) return []
   return taskStore.tasks
     .filter(t => t.parent_id === task.value!.id)
-    .sort((a, b) => a.position - b.position)
+    .sort((a, b) => a.id - b.id)
 })
 
 const subtaskProgress = computed(() => {
@@ -305,10 +372,14 @@ async function loadLogs() {
 }
 
 async function sendComment() {
-  if (!task.value || !commentText.value.trim()) return
-  await logStore.appendLog(task.value.id, { task_id: task.value.id, type: 'comment', content: commentText.value.trim() })
-  try { const { useSyncStore } = require('@/stores/syncStore') || await import('@/stores/syncStore'); useSyncStore().incrementDirty() } catch {}
+  if (!task.value || (!commentText.value.trim() && commentImages.value.length === 0)) return
+  await logStore.appendLog(task.value.id, {
+    task_id: task.value.id, type: 'comment',
+    content: commentText.value.trim(),
+    images: JSON.stringify(commentImages.value)
+  })
   commentText.value = ''
+  commentImages.value = []
 }
 
 function startEditLog(log: any) {
@@ -369,7 +440,6 @@ const newSubtaskTitle = ref('')
 const subtaskInputRef = ref()
 
 const titleInputRef = ref()
-const descInputRef = ref()
 
 // 监听任务切换，重置编辑状态
 watch(task, () => {
@@ -379,6 +449,8 @@ watch(task, () => {
   newSubtaskTitle.value = ''
   activeTab.value = 'detail'
   commentText.value = ''
+  descImages.value = []
+  commentImages.value = []
   if (task.value) {
     tagStore.loadProjectTags(task.value.project_id)
     tagStore.loadTaskTags(task.value.id)
@@ -394,30 +466,57 @@ watch(showAddSubtask, (val) => {
   }
 })
 
+// ESC 关闭图片预览
+const handlePreviewEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') previewImage.value = null }
+watch(previewImage, (val) => {
+  if (val) document.addEventListener('keydown', handlePreviewEsc)
+  else document.removeEventListener('keydown', handlePreviewEsc)
+})
+onUnmounted(() => document.removeEventListener('keydown', handlePreviewEsc))
+
 function formatDateTime(date: string) {
-  return date ? dayjs(date).format('YYYY-MM-DD HH:mm') : '-'
+  return date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'
 }
 
 function startEdit(field: string) {
   editingField.value = field
   // 初始化表单数据
-  editForm.value = {
+    editForm.value = {
     title: task.value!.title,
     description: task.value!.description,
     status: task.value!.status,
-    priority: task.value!.priority,
-    start_date: task.value!.start_date,
-    end_date: task.value!.end_date
+    priority: task.value!.priority
   }
 
   // 自动聚焦
   nextTick(() => {
     if (field === 'title' && titleInputRef.value) {
       titleInputRef.value.focus()
-    } else if (field === 'description' && descInputRef.value) {
-      descInputRef.value.focus()
+    } else if (field === 'description' && descTextareaRef.value) {
+      descTextareaRef.value.focus()
+      autoResizeTextarea()
+      nextTick(() => smartScrollToDescription())
     }
   })
+}
+
+function autoResizeTextarea() {
+  const el = descTextareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
+function smartScrollToDescription() {
+  const el = descTextareaRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const viewH = window.innerHeight
+  if (rect.height <= viewH) {
+    el.scrollIntoView({ block: 'end', behavior: 'smooth' })
+  } else {
+    el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }
 }
 
 async function saveField(field: string) {
@@ -426,13 +525,18 @@ async function saveField(field: string) {
   const value = (editForm.value as any)[field]
   const oldValue = (task.value as any)[field]
 
-  if (value === oldValue) {
-    editingField.value = null
-    return
-  }
-
   try {
-    await taskStore.updateTask(task.value.id, { [field]: value } as any)
+    if (field === 'description') {
+      if (value === oldValue && descImages.value.length === 0) { editingField.value = null; return }
+      await taskStore.updateTask(task.value.id, { description: value, images: JSON.stringify(descImages.value) } as any)
+      // 刷新 viewingTask 指针到最新
+      const refreshed = taskStore.tasks.find(t => t.id === task.value!.id)
+      if (refreshed) uiStore.viewingTask = refreshed
+      descImages.value = []
+    } else {
+      if (value === oldValue) { editingField.value = null; return }
+      await taskStore.updateTask(task.value.id, { [field]: value } as any)
+    }
     ElMessage.success('已更新')
   } catch (e: any) {
     ElMessage.error(e.message || '更新失败')
@@ -443,6 +547,12 @@ async function saveField(field: string) {
 
 function handleClose() {
   uiStore.closeTaskDetail()
+}
+
+function handlePanelBodyClick() {
+  if (editingField.value) {
+    saveField(editingField.value)
+  }
 }
 
 async function handleDelete() {
@@ -742,4 +852,19 @@ function openParentTask() {
 .log-item:hover .log-delete { opacity: 1; }
 .log-delete:hover { color: #f56c6c; }
 .comment-box { margin-top: 12px; }
+
+.image-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.image-item { position: relative; width: 80px; height: 80px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color); }
+.image-item img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+.image-item.small { width: 48px; height: 48px; }
+.image-remove { position: absolute; top: 0; right: 0; width: 18px; height: 18px; background: rgba(0,0,0,0.5); color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 0 0 0 4px; }
+.image-remove:hover { background: #f56c6c; }
+.image-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-color); margin: 4px; }
+.log-images { display: flex; flex-wrap: wrap; }
+.comment-image-list { margin-bottom: 8px; }
+
+.image-preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.image-preview-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+.desc-textarea { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: none; font-size: 13px; background: var(--bg-primary); color: var(--text-primary); min-height: 80px; overflow-y: hidden; }
+.comment-textarea { flex: 1; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: none; font-size: 13px; background: var(--bg-primary); color: var(--text-primary); }
 </style>

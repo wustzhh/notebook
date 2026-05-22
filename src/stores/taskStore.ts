@@ -1,13 +1,17 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import dayjs from 'dayjs'
+import { ElMessage } from 'element-plus'
 import { taskService } from '@/services/taskService'
 import { useProjectStore } from './projectStore'
-import type { Task, TaskStatus, TaskCreateData, TaskUpdateData } from '@/types/task'
+import type { Task, TaskStatus, TaskPriority, TaskCreateData, TaskUpdateData } from '@/types/task'
 import { useLogStore } from './logStore'
+import { useAuthStore } from './authStore'
+import { getNextLocalId, registerRemoteId, updateMaxFromItems } from '@/utils/idManager'
 
 async function markDirty() {
   try {
-    const { useSyncStore } = require('./syncStore')
+    const { useSyncStore } = await import('./syncStore')
     useSyncStore().incrementDirty()
   } catch { /* store not available */ }
 }
@@ -87,6 +91,7 @@ export const useTaskStore = defineStore('tasks', () => {
     error.value = null
     try {
       tasks.value = await taskService.getAll()
+      updateMaxFromItems('tasks', tasks.value)
     } catch (e: any) {
       error.value = e.message
       console.error('Failed to load tasks:', e)
@@ -97,6 +102,23 @@ export const useTaskStore = defineStore('tasks', () => {
 
   async function createTask(data: TaskCreateData) {
     try {
+      const auth = useAuthStore()
+      let online = false
+      console.log('[createTask] serverUrl:', !!auth.serverUrl, 'token:', !!auth.token, 'serverUrl_val:', auth.serverUrl)
+      if (auth.serverUrl && auth.token) {
+        try {
+          const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
+          ;(data as any)._clientId = result.ids[0]
+          registerRemoteId('tasks', result.ids[0])
+          online = true
+          console.log('[createTask] genId SUCCESS, server_id:', result.ids[0])
+        } catch (e: any) {
+          console.log('[createTask] genId FAILED:', e.message)
+        }
+      }
+      if (!(data as any)._clientId) {
+        ;(data as any)._clientId = getNextLocalId('tasks')
+      }
       const newTask = await taskService.create(data)
       // 检查返回值是否有效
       if (!newTask) {
@@ -105,6 +127,18 @@ export const useTaskStore = defineStore('tasks', () => {
       tasks.value = [...tasks.value, newTask]
       logChange(newTask.id, { task_id: newTask.id, type: 'created', content: '创建了任务' })
       markDirty()
+
+      console.log('[createTask] online:', online, 'will call manualSync')
+      // 在线时立即推送获取 seq_number
+      if (online) {
+        try {
+          const { useSyncStore } = await import('./syncStore')
+          console.log('[createTask] calling manualSync...')
+          await useSyncStore().manualSync()
+          console.log('[createTask] manualSync done')
+        } catch (e: any) { ElMessage.warning('自动同步失败，将在下次自动同步时重试') }
+      }
+
       return newTask
     } catch (e: any) {
       error.value = e.message
@@ -116,6 +150,15 @@ export const useTaskStore = defineStore('tasks', () => {
   async function updateTask(id: number, data: TaskUpdateData) {
     try {
       const oldTask = tasks.value.find(t => t.id === id)
+      if (oldTask && data.status !== undefined && data.status !== oldTask.status) {
+        const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+        if (oldTask.status === 'todo' && data.status !== 'todo' && !oldTask.start_date) {
+          ;(data as any).start_date = now
+        }
+        if (data.status === 'done' && !oldTask.end_date) {
+          ;(data as any).end_date = now
+        }
+      }
       const updatedTask = await taskService.update(id, data)
       tasks.value = tasks.value.map(t => t.id === id ? updatedTask : t)
 
@@ -185,6 +228,11 @@ export const useTaskStore = defineStore('tasks', () => {
 
       // 后台同步到数据库
       await taskService.reorder(updates)
+      // 同步内存中的 sync_version
+      for (const u of updates) {
+        const t = tasks.value.find(tt => tt.id === u.id)
+        if (t) { (t as any).sync_version = 0; (t as any).updated_at = new Date().toISOString() }
+      }
       markDirty()
     } catch (e: any) {
       error.value = e.message
@@ -264,6 +312,29 @@ export const useTaskStore = defineStore('tasks', () => {
       ]
       
       await taskService.reorder(allUpdates)
+
+      // 跨状态拖拽时，自动记录开始/完成时间
+      if (oldStatus !== newStatus) {
+        const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+        const dateUpdates: any = {}
+        if (oldStatus === 'todo' && !task.start_date) {
+          dateUpdates.start_date = now
+          task.start_date = now
+        }
+        if (newStatus === 'done' && !task.end_date) {
+          dateUpdates.end_date = now
+          task.end_date = now
+        }
+        if (Object.keys(dateUpdates).length > 0) {
+          await taskService.update(taskId, dateUpdates)
+        }
+      }
+
+      for (const u of allUpdates) {
+        const t = tasks.value.find(tt => tt.id === u.id)
+        if (t) { (t as any).sync_version = 0; (t as any).updated_at = new Date().toISOString() }
+      }
+      markDirty()
     } catch (e: any) {
       error.value = e.message
       console.error('Failed to move task:', e)
@@ -282,7 +353,7 @@ export const useTaskStore = defineStore('tasks', () => {
   function getSubtasks(parentId: number): Task[] {
     return tasks.value
       .filter(t => t.parent_id === parentId)
-      .sort((a, b) => a.position - b.position)
+      .sort((a, b) => a.id - b.id)
   }
 
   // 获取某任务是否有子任务
@@ -313,6 +384,23 @@ export const useTaskStore = defineStore('tasks', () => {
       const parentTask = tasks.value.find(t => t.id === parentId)
       if (!parentTask) throw new Error('父任务不存在')
 
+      let cid: number | undefined
+      let online = false
+      const auth = useAuthStore()
+      if (auth.serverUrl && auth.token) {
+        try {
+          const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tasks', 1)
+          cid = result.ids[0]
+          registerRemoteId('tasks', cid)
+          online = true
+        } catch {
+          // genId 失败仅回退到本地 ID，不踢出登录
+        }
+      }
+      if (!cid) {
+        cid = getNextLocalId('tasks')
+      }
+
       const newTask = await taskService.create({
         title: data.title,
         description: data.description || '',
@@ -320,8 +408,9 @@ export const useTaskStore = defineStore('tasks', () => {
         parent_id: parentId,
         status: data.status || 'todo',
         priority: data.priority || 'medium',
-        position
-      })
+        position,
+        _clientId: cid
+      } as any)
       // 检查返回值是否有效
       if (!newTask) {
         throw new Error('创建子任务失败：返回空值')
@@ -329,6 +418,14 @@ export const useTaskStore = defineStore('tasks', () => {
       // 使用数组替换而非 push，确保触发响应式更新
       tasks.value = [...tasks.value, newTask]
       markDirty()
+
+      if (online) {
+        try {
+          const { useSyncStore } = await import('./syncStore')
+          await useSyncStore().manualSync()
+        } catch (e: any) { ElMessage.warning('自动同步失败，将在下次自动同步时重试') }
+      }
+
       return newTask
     } catch (e: any) {
       error.value = e.message
@@ -341,7 +438,12 @@ export const useTaskStore = defineStore('tasks', () => {
   async function toggleSubtaskDone(subtaskId: number, done: boolean) {
     try {
       const newStatus: TaskStatus = done ? 'done' : 'todo'
-      const updatedTask = await taskService.update(subtaskId, { status: newStatus })
+      const subtask = tasks.value.find(t => t.id === subtaskId)
+      const data: any = { status: newStatus }
+      if (done && subtask && !subtask.end_date) {
+        data.end_date = dayjs().format('YYYY-MM-DD HH:mm:ss')
+      }
+      const updatedTask = await taskService.update(subtaskId, data)
       // 使用数组替换，确保触发响应式更新
       tasks.value = tasks.value.map(t => t.id === subtaskId ? updatedTask : t)
       markDirty()

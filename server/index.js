@@ -1,7 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
-const { initDb } = require('./database')
+const { initAuthDb } = require('./database')
 const authRoutes = require('./routes/auth')
 const syncRoutes = require('./routes/sync')
 const { verifyToken } = require('./middleware/auth')
@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 3000
 
 app.use(cors())
 app.use(express.json({ limit: '10mb' }))
+app.use((req, _res, next) => { console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`); next() })
 
 app.use('/auth', authRoutes)
 app.use('/sync', verifyToken, syncRoutes)
@@ -20,7 +21,7 @@ app.get('/health', (_req, res) => {
 })
 
 async function start() {
-  await initDb()
+  await initAuthDb()
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Task Tracker Server running on port ${PORT}`)
   })

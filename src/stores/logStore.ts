@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { TaskLog } from '@/types/task'
+import { useAuthStore } from './authStore'
+import { getNextLocalId, registerRemoteId } from '@/utils/idManager'
 
 export const useLogStore = defineStore('logs', () => {
   const logs = ref<Record<number, TaskLog[]>>({})
@@ -30,15 +33,31 @@ export const useLogStore = defineStore('logs', () => {
 
   async function appendLog(taskId: number, data: any) {
     try {
-      await window.logAPI.create(data)
+      if (data.type === 'comment') {
+        const auth = useAuthStore()
+        if (auth.serverUrl && auth.token) {
+          try {
+            const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'logs', 1)
+            data._clientId = result.ids[0]
+            registerRemoteId('logs', result.ids[0])
+        } catch {
+          // genId 失败仅回退到本地 ID，不踢出登录
+        }
+        }
+        if (!data._clientId) {
+          data._clientId = getNextLocalId('logs')
+        }
+      }
+      const id = await window.logAPI.create(data)
       const entry: TaskLog = {
-        id: Date.now(),
+        id: id || Date.now(),
         task_id: taskId,
         type: data.type,
         content: data.content,
         old_value: data.old_value || null,
         new_value: data.new_value || null,
         field: data.field || null,
+        images: data.images || '[]',
         created_at: new Date().toISOString()
       }
       if (!logs.value[taskId]) logs.value[taskId] = []

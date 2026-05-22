@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { Tag } from '@/types/tag'
 import { useProjectStore } from './projectStore'
+import { useAuthStore } from './authStore'
+import { getNextLocalId, registerRemoteId } from '@/utils/idManager'
 
 export const useTagStore = defineStore('tags', () => {
   const tags = ref<Tag[]>([])
@@ -36,8 +39,34 @@ export const useTagStore = defineStore('tags', () => {
   async function createTag(name: string, color: string): Promise<Tag | null> {
     try {
       const projectId = useProjectStore().currentProjectId
-      const tag = await window.tagAPI.create({ name, color, project_id: projectId })
+      const data: any = { name, color, project_id: projectId }
+
+      const auth = useAuthStore()
+      let online = false
+      if (auth.serverUrl && auth.token) {
+        try {
+          const result = await window.syncAPI.genId(auth.serverUrl, auth.token, 'tags', 1)
+          data._clientId = result.ids[0]
+          registerRemoteId('tags', result.ids[0])
+          online = true
+        } catch {
+          // genId 失败仅回退到本地 ID，不踢出登录
+        }
+      }
+      if (!data._clientId) {
+        data._clientId = getNextLocalId('tags')
+      }
+
+      const tag = await window.tagAPI.create(data)
       tags.value.push(tag)
+
+      if (online) {
+        try {
+          const { useSyncStore } = await import('./syncStore')
+          await useSyncStore().manualSync()
+        } catch (e: any) { ElMessage.warning('自动同步失败，将在下次自动同步时重试') }
+      }
+
       return tag
     } catch {
       return null

@@ -47,13 +47,29 @@ function registerTaskHandlers(mainWindow) {
             const newPosition = (maxPosResult?.max_pos || 0) + 1;
             let id;
             if (taskData._remoteId) {
-                id = (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]);
+                id = taskData._remoteId;
+                (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+                    taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']);
+            }
+            else if (taskData._clientId) {
+                id = taskData._clientId;
+                // 如果本地已存在该 ID，换用 generateId 避免覆盖已有数据
+                if ((0, database_js_1.queryOne)('SELECT 1 FROM tasks WHERE id = ?', [id])) {
+                    id = (0, database_js_1.generateId)();
+                }
+                (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+                    taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']);
             }
             else {
                 id = (0, database_js_1.generateId)();
-                (0, database_js_1.execute)(`INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]);
+                (0, database_js_1.execute)(`INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+                    taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+                    newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']);
             }
             const newTask = (0, database_js_1.queryOne)(`
         SELECT t.*, p.name as project_name, p.key as project_key
@@ -108,8 +124,13 @@ function registerTaskHandlers(mainWindow) {
                 fields.push('parent_id = ?');
                 values.push(data.parent_id);
             }
+            if (data.images !== undefined) {
+                fields.push('images = ?');
+                values.push(data.images);
+            }
             fields.push('sync_version = 0');
-            fields.push('updated_at = CURRENT_TIMESTAMP');
+            fields.push('updated_at = ?');
+            values.push(new Date().toISOString());
             values.push(id);
             (0, database_js_1.execute)(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`, values);
             const updatedTask = (0, database_js_1.queryOne)(`
@@ -135,6 +156,10 @@ function registerTaskHandlers(mainWindow) {
     electron_1.ipcMain.handle('tasks:delete', async (_event, id) => {
         try {
             await (0, database_js_1.initDatabase)();
+            (0, database_js_1.execute)('DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE parent_id = ?)', [id]);
+            (0, database_js_1.execute)('DELETE FROM task_logs WHERE task_id = ?', [id]);
+            (0, database_js_1.execute)('DELETE FROM task_tags WHERE task_id = ?', [id]);
+            (0, database_js_1.execute)('DELETE FROM tasks WHERE parent_id = ?', [id]);
             (0, database_js_1.execute)('DELETE FROM tasks WHERE id = ?', [id]);
             // 通知渲染进程
             mainWindow.webContents.send('task-deleted', id);
@@ -148,12 +173,11 @@ function registerTaskHandlers(mainWindow) {
     electron_1.ipcMain.handle('tasks:reorder', async (_event, updates) => {
         try {
             await (0, database_js_1.initDatabase)();
-            // 使用事务批量更新
+            const now = new Date().toISOString();
             for (const update of updates) {
-                (0, database_js_1.execute)('UPDATE tasks SET status = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [update.status, update.position, update.id]);
+                (0, database_js_1.execute)('UPDATE tasks SET status = ?, position = ?, sync_version = 0, updated_at = ? WHERE id = ?', [update.status, update.position, now, update.id]);
             }
             (0, database_js_1.saveDatabase)();
-            // 通知渲染进程刷新
             mainWindow.webContents.send('tasks-reordered');
         }
         catch (error) {
@@ -164,10 +188,10 @@ function registerTaskHandlers(mainWindow) {
     // 批量保存（同步下载的数据）
     electron_1.ipcMain.handle('tasks:save-all', async (_event, data) => {
         await (0, database_js_1.initDatabase)();
-        const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'sync_version', 'created_at', 'updated_at'];
+        const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'seq_number', 'seq_assigned', 'images', 'sync_version', 'created_at', 'updated_at'];
         for (const t of data) {
             try {
-                const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()];
+                const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.seq_number || 0, t.seq_assigned || 0, t.images || '[]', t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()];
                 const existing = (0, database_js_1.queryOne)('SELECT id FROM tasks WHERE id = ?', [t.id]);
                 if (existing) {
                     (0, database_js_1.execute)(`UPDATE tasks SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, t.id]);

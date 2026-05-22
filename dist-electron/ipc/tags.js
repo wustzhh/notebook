@@ -30,7 +30,20 @@ function registerTagHandlers(mainWindow) {
             const existing = (0, database_js_1.queryOne)('SELECT * FROM tags WHERE name = ? AND project_id = ?', [data.name, data.project_id]);
             if (existing)
                 return existing;
-            const id = (0, database_js_1.execute)('INSERT INTO tags (name, color, project_id) VALUES (?, ?, ?)', [data.name, data.color || '#409EFF', data.project_id]);
+            let id;
+            if (data._remoteId) {
+                id = data._remoteId;
+            }
+            else if (data._clientId) {
+                id = data._clientId;
+                if ((0, database_js_1.queryOne)('SELECT 1 FROM tags WHERE id = ?', [id])) {
+                    id = (0, database_js_1.generateId)();
+                }
+            }
+            else {
+                id = (0, database_js_1.generateId)();
+            }
+            (0, database_js_1.execute)('INSERT INTO tags (id, name, color, project_id) VALUES (?, ?, ?, ?)', [id, data.name, data.color || '#409EFF', data.project_id]);
             const tag = (0, database_js_1.queryOne)('SELECT * FROM tags WHERE id = ?', [id]);
             mainWindow.webContents.send('tag-created', tag);
             return tag;

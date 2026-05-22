@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs')
-const { initDb, queryAll, queryOne, execute } = require('./database')
+const { initAuthDb, deleteUserDb, saveAuthDb, queryAll, queryOne, execute } = require('./database')
 
 const args = process.argv.slice(2)
 const command = args[0]
@@ -17,30 +17,30 @@ function parseArgv(argv) {
 }
 
 async function addUser(opts) {
-  await initDb()
+  const authDb = await initAuthDb()
   const { email, password } = opts
   if (!email || !password) {
     console.log('用法: node cli.js add-user --email xxx --password xxx')
     process.exit(1)
   }
 
-  const existing = queryOne('SELECT id FROM users WHERE email = ?', [email])
+  const existing = queryOne(authDb, 'SELECT id FROM users WHERE email = ?', [email])
   if (existing) {
     console.log('❌ 该邮箱已存在')
     process.exit(1)
   }
 
   const hash = bcrypt.hashSync(password, 10)
-  execute('INSERT INTO users (email, password) VALUES (?, ?)', [email, hash])
+  execute(authDb, 'INSERT INTO users (email, password) VALUES (?, ?)', [email, hash])
+  saveAuthDb()
 
   console.log('✅ 用户创建成功')
   console.log(`   邮箱: ${email}`)
-  console.log(`   密码: ${password}`)
 }
 
 async function listUsers() {
-  await initDb()
-  const users = queryAll('SELECT id, email, created_at FROM users ORDER BY id')
+  const authDb = await initAuthDb()
+  const users = queryAll(authDb, 'SELECT id, email, created_at FROM users ORDER BY id')
   if (users.length === 0) {
     console.log('暂无用户')
     return
@@ -53,37 +53,38 @@ async function listUsers() {
 }
 
 async function delUser(opts) {
-  await initDb()
+  const authDb = await initAuthDb()
   const { email } = opts
   if (!email) {
     console.log('用法: node cli.js del-user --email xxx')
     process.exit(1)
   }
-  const user = queryOne('SELECT id FROM users WHERE email = ?', [email])
+  const user = queryOne(authDb, 'SELECT id FROM users WHERE email = ?', [email])
   if (!user) {
     console.log('❌ 用户不存在')
     process.exit(1)
   }
-  execute('DELETE FROM tasks WHERE user_id = ?', [user.id])
-  execute('DELETE FROM projects WHERE user_id = ?', [user.id])
-  execute('DELETE FROM users WHERE id = ?', [user.id])
-  console.log(`✅ 用户 ${email} 及其数据已删除`)
+  execute(authDb, 'DELETE FROM users WHERE id = ?', [user.id])
+  saveAuthDb()
+  deleteUserDb(user.id)
+  console.log(`✅ 用户 ${email} 及其数据文件已删除`)
 }
 
 async function resetPassword(opts) {
-  await initDb()
+  const authDb = await initAuthDb()
   const { email, password } = opts
   if (!email || !password) {
     console.log('用法: node cli.js reset-password --email xxx --password xxx')
     process.exit(1)
   }
-  const user = queryOne('SELECT id FROM users WHERE email = ?', [email])
+  const user = queryOne(authDb, 'SELECT id FROM users WHERE email = ?', [email])
   if (!user) {
     console.log('❌ 用户不存在')
     process.exit(1)
   }
   const hash = bcrypt.hashSync(password, 10)
-  execute('UPDATE users SET password = ? WHERE id = ?', [hash, user.id])
+  execute(authDb, 'UPDATE users SET password = ? WHERE id = ?', [hash, user.id])
+  saveAuthDb()
   console.log('✅ 密码已重置')
   console.log(`   邮箱: ${email}`)
   console.log(`   新密码: ${password}`)

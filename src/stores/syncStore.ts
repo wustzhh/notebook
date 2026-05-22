@@ -5,6 +5,7 @@ import { useProjectStore } from './projectStore'
 import { useTaskStore } from './taskStore'
 import { useTagStore } from './tagStore'
 import { useLogStore } from './logStore'
+import { updateMaxFromItems, updateMaxFromRemap } from '@/utils/idManager'
 
 export const useSyncStore = defineStore('sync', () => {
   const lastSyncTime = ref<string>(localStorage.getItem('sync_last_time') || '')
@@ -49,7 +50,11 @@ export const useSyncStore = defineStore('sync', () => {
 
   async function pushToServer(): Promise<boolean> {
     const auth = useAuthStore()
-    if (!auth.token || !auth.serverUrl) return false
+    console.log('[pushToServer] token:', !!auth.token, 'url:', !!auth.serverUrl, 'loggedIn:', auth.isLoggedIn)
+    if (!auth.token || !auth.serverUrl) {
+      console.log('[pushToServer] ABORT: missing token or serverUrl')
+      return false
+    }
 
     isSyncing.value = true
     lastError.value = null
@@ -61,6 +66,10 @@ export const useSyncStore = defineStore('sync', () => {
       const dirtyProjects = projectStore.projects.filter(p => !p.sync_version || p.sync_version === 0)
       const dirtyTasks = taskStore.tasks.filter(t => !t.sync_version || t.sync_version === 0)
 
+      if (dirtyTasks.length > 0) {
+        console.log('[push] dirty tasks:', dirtyTasks.map(t => `${t.id}(${t.seq_number||0}):${t.status}:sv${t.sync_version}`).join(', '))
+      }
+
       const comments: any[] = []
       for (const entryLogs of Object.values(logStore.logs)) {
         for (const l of entryLogs) {
@@ -68,13 +77,18 @@ export const useSyncStore = defineStore('sync', () => {
         }
       }
 
-      const hasChanges = dirtyProjects.length > 0 || dirtyTasks.length > 0 || comments.length > 0
+      const hasDeletions = projectStore.deletedProjectIds.length > 0
+        || taskStore.deletedTaskIds.length > 0
+        || logStore.deletedCommentIds.length > 0
+      const hasChanges = dirtyProjects.length > 0 || dirtyTasks.length > 0 || comments.length > 0 || hasDeletions
+      console.log('[pushToServer] dirtyProjects:', dirtyProjects.length, 'dirtyTasks:', dirtyTasks.length, 'comments:', comments.length, 'deletions:', hasDeletions)
       if (!hasChanges) {
+        console.log('[pushToServer] SKIP: no changes')
         dirtyCount.value = 0
         return true
       }
 
-      const result = await syncFetch(auth.serverUrl, auth.token, '/sync/push', 'POST', {
+      const pushData = JSON.parse(JSON.stringify({
         projects: dirtyProjects,
         tasks: dirtyTasks,
         tags: collectAllTags(),
@@ -83,18 +97,53 @@ export const useSyncStore = defineStore('sync', () => {
         deleted_comment_ids: [...logStore.deletedCommentIds],
         deleted_project_ids: [...projectStore.deletedProjectIds],
         deleted_task_ids: [...taskStore.deletedTaskIds]
-      })
+      }))
+      const result = await syncFetch(auth.serverUrl, auth.token, '/sync/push', 'POST', pushData)
 
-      if (result.projects) {
-        for (const sp of result.projects) {
-          const p = projectStore.projects.find(pp => pp.id === sp.id)
-          if (p) (p as any).sync_version = sp.sync_version
+      console.log('[push RESPONSE] id_remap:', JSON.stringify(result.id_remap || {}), 'tasks count:', result.tasks?.length || 0)
+      if (result.tasks && result.tasks.length > 0) {
+        for (const st of result.tasks) {
+          if (st.seq_assigned) {
+            console.log('[push RESPONSE task]', st.id, 'seq:', st.seq_number, 'assigned:', st.seq_assigned, 'sv:', st.sync_version)
+          }
         }
       }
-      if (result.tasks) {
+
+      if (result.id_remap) {
+        for (const [oldId, newId] of Object.entries(result.id_remap)) {
+          const pid = Number(oldId)
+          const pidx = projectStore.projects.findIndex(p => p.id === pid)
+          if (pidx >= 0) projectStore.projects.splice(pidx, 1, { ...projectStore.projects[pidx], id: Number(newId) })
+          const tidx = taskStore.tasks.findIndex(t => t.id === pid)
+          if (tidx >= 0) taskStore.tasks.splice(tidx, 1, { ...taskStore.tasks[tidx], id: Number(newId) })
+        }
+      }
+      if (result.id_remap) updateMaxFromRemap(result.id_remap)
+
+      // ID 重映射之后再用新 ID 匹配，确保 sync_version / seq_number 能正确更新
+      if (result.projects && result.projects.length > 0) {
+        for (const sp of result.projects) {
+          const idx = projectStore.projects.findIndex(pp => pp.id === sp.id)
+          if (idx < 0) continue
+          if (sp.sync_version !== undefined && (projectStore.projects[idx] as any).sync_version !== sp.sync_version) {
+            projectStore.projects.splice(idx, 1, { ...projectStore.projects[idx], sync_version: sp.sync_version })
+          }
+        }
+      }
+      if (result.tasks && result.tasks.length > 0) {
         for (const st of result.tasks) {
-          const t = taskStore.tasks.find(tt => tt.id === st.id)
-          if (t) (t as any).sync_version = st.sync_version
+          const idx = taskStore.tasks.findIndex(tt => tt.id === st.id)
+          console.log('[push PROCESS] server_id:', st.id, 'seq_assigned:', st.seq_assigned, 'found local:', idx >= 0, 'local_ids:', taskStore.tasks.map(tt => tt.id).join(','))
+          if (idx < 0) continue
+          const t = taskStore.tasks[idx]
+          if (st.seq_assigned && (!t.seq_assigned || t.seq_number !== st.seq_number)) {
+            taskStore.tasks.splice(idx, 1, { ...t, seq_number: st.seq_number, seq_assigned: st.seq_assigned, sync_version: st.sync_version || t.sync_version })
+            console.log('[push UPDATED] task', st.id, 'seq:', st.seq_number)
+            const verify = taskStore.tasks.find(tt => tt.id === st.id)
+            console.log('[push VERIFY] task', st.id, 'in_store seq_assigned:', verify?.seq_assigned, 'seq_number:', verify?.seq_number)
+          } else if (st.sync_version !== undefined && (t as any).sync_version !== st.sync_version) {
+            taskStore.tasks.splice(idx, 1, { ...t, sync_version: st.sync_version })
+          }
         }
       }
 
@@ -139,7 +188,9 @@ export const useSyncStore = defineStore('sync', () => {
         for (const sp of result.projects) {
           const idx = projectStore.projects.findIndex(p => p.id === sp.id)
           if (idx >= 0) {
-            projectStore.projects[idx] = sp
+            if (new Date(sp.updated_at) >= new Date(projectStore.projects[idx].updated_at || 0)) {
+              Object.assign(projectStore.projects[idx], sp)
+            }
           } else {
             projectStore.projects.push(sp)
           }
@@ -147,11 +198,21 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       if (result.tasks && result.tasks.length > 0) {
+        console.log('[pull] server tasks count:', result.tasks.length)
         for (const st of result.tasks) {
+          if (st.seq_assigned) console.log('[pull task]', st.id, 'seq:', st.seq_number, 'assigned:', st.seq_assigned)
           const idx = taskStore.tasks.findIndex(t => t.id === st.id)
+          console.log('[pull FIND] server_id:', st.id, 'found_local_idx:', idx, 'local_ids:', taskStore.tasks.map(t => t.id).join(','))
           if (idx >= 0) {
-            taskStore.tasks[idx] = st
+            if (new Date(st.updated_at) >= new Date(taskStore.tasks[idx].updated_at || 0)) {
+              taskStore.tasks.splice(idx, 1, { ...taskStore.tasks[idx], ...st })
+            }
           } else {
+            const project = projectStore.projects.find(p => p.id === st.project_id)
+            if (project) {
+              st.project_name = project.name
+              st.project_key = project.key
+            }
             taskStore.tasks.push(st)
           }
         }
@@ -199,6 +260,13 @@ export const useSyncStore = defineStore('sync', () => {
       const newIds = taskStore.tasks.map(t => t.id)
       for (const id of newIds) await tagStore.loadTaskTags(id)
       dirtyCount.value = 0
+
+      updateMaxFromItems('projects', projectStore.projects)
+      updateMaxFromItems('tasks', taskStore.tasks)
+      updateMaxFromItems('tags', tagStore.tags)
+      for (const ls of Object.values(logStore.logs)) {
+        for (const l of ls) updateMaxFromItems('logs', [l])
+      }
 
       return true
     } catch (e: any) {
@@ -297,13 +365,14 @@ export const useSyncStore = defineStore('sync', () => {
         }
       }
 
-      await syncFetch(auth.serverUrl, auth.token, '/sync/push', 'POST', {
+      const pushData = JSON.parse(JSON.stringify({
         projects: projectStore.projects,
         tasks: taskStore.tasks,
         tags: collectAllTags(),
         task_tags: collectTaskTagsData(),
         task_logs: comments
-      })
+      }))
+      await syncFetch(auth.serverUrl, auth.token, '/sync/push', 'POST', pushData)
       dirtyCount.value = 0
       return true
     } catch (e: any) {
@@ -315,33 +384,22 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   async function syncFetch(serverUrl: string, token: string, path: string, method: string, body?: any): Promise<any> {
-    try {
-      if (method === 'POST' && body) {
-        return await window.syncAPI.push(serverUrl, token, body)
-      } else if (path.startsWith('/sync/pull')) {
-        const since = new URLSearchParams(path.split('?')[1] || '').get('since') || ''
-        return await window.syncAPI.pull(serverUrl, token, since)
-      } else if (path === '/sync/full') {
-        return await window.syncAPI.full(serverUrl, token)
-      }
-    } catch { /* Electron not available, use direct fetch */ }
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+    if (method === 'POST' && body) {
+      return await window.syncAPI.push(serverUrl, token, body)
+    } else if (path.startsWith('/sync/pull')) {
+      const since = new URLSearchParams(path.split('?')[1] || '').get('since') || ''
+      return await window.syncAPI.pull(serverUrl, token, since)
+    } else if (path === '/sync/full') {
+      return await window.syncAPI.full(serverUrl, token)
     }
-    const url = `${serverUrl}${path}`
-    const resp = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined })
-    if (!resp.ok) {
-      if (resp.status === 401) throw new Error('TOKEN_EXPIRED')
-      throw new Error('同步请求失败')
-    }
-    return await resp.json()
+    throw new Error('未知的同步请求类型')
   }
 
   async function manualSync() {
     const pushed = await pushToServer()
-    if (!pushed) return
+    if (!pushed) {
+      lastError.value = lastError.value || '推送失败，将仅尝试拉取服务器数据'
+    }
     await pullFromServer()
   }
 
@@ -358,6 +416,8 @@ export const useSyncStore = defineStore('sync', () => {
         const hasDirty = projectStore.projects.some(p => !p.sync_version || p.sync_version === 0)
           || taskStore.tasks.some(t => !t.sync_version || t.sync_version === 0)
           || logStore.deletedCommentIds.length > 0
+          || projectStore.deletedProjectIds.length > 0
+          || taskStore.deletedTaskIds.length > 0
         if (hasDirty) await pushToServer()
         await pullFromServer()
       } finally {

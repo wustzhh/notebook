@@ -110,6 +110,7 @@ interface SyncAPI {
   full: (serverUrl: string, token: string) => Promise<any>
   health: (serverUrl: string) => Promise<boolean>
   getLastTime: () => Promise<string>
+  genId: (serverUrl: string, token: string, entity: string, count: number) => Promise<{ ids: number[] }>
 }
 
 const authAPI: AuthAPI = {
@@ -126,7 +127,8 @@ const syncAPI: SyncAPI = {
   pull: (serverUrl: string, token: string, since: string) => ipcRenderer.invoke('sync:pull', serverUrl, token, since),
   full: (serverUrl: string, token: string) => ipcRenderer.invoke('sync:full', serverUrl, token),
   health: (serverUrl: string) => ipcRenderer.invoke('sync:health', serverUrl),
-  getLastTime: () => ipcRenderer.invoke('sync:get-last-time')
+  getLastTime: () => ipcRenderer.invoke('sync:get-last-time'),
+  genId: (serverUrl: string, token: string, entity: string, count: number) => ipcRenderer.invoke('sync:gen-id', serverUrl, token, entity, count)
 }
 
 contextBridge.exposeInMainWorld('authAPI', authAPI)

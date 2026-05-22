@@ -11,6 +11,7 @@ const auth_js_1 = require("./ipc/auth.js");
 const sync_js_1 = require("./ipc/sync.js");
 const tags_js_1 = require("./ipc/tags.js");
 const logs_js_1 = require("./ipc/logs.js");
+const serverConfig_js_1 = require("./ipc/serverConfig.js");
 // __dirname 在 CommonJS 中全局可用，无需声明
 let mainWindow = null;
 function createWindow() {
@@ -37,6 +38,12 @@ function createWindow() {
         // 生产环境加载打包后的文件
         mainWindow.loadFile(path_1.default.join(__dirname, '../dist/index.html'));
     }
+    // F12 打开 DevTools
+    mainWindow.webContents.on('before-input-event', (_event, input) => {
+        if (input.key === 'F12' && input.type === 'keyDown') {
+            mainWindow?.webContents.toggleDevTools();
+        }
+    });
     mainWindow.once('ready-to-show', () => {
         mainWindow?.show();
     });
@@ -55,6 +62,7 @@ electron_1.app.whenReady().then(() => {
     (0, sync_js_1.registerSyncHandlers)();
     (0, tags_js_1.registerTagHandlers)(mainWindow);
     (0, logs_js_1.registerLogHandlers)();
+    (0, serverConfig_js_1.registerServerConfigHandlers)();
     electron_1.app.on('activate', () => {
         if (electron_1.BrowserWindow.getAllWindows().length === 0) {
             createWindow();

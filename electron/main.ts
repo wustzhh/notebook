@@ -6,6 +6,7 @@ import { registerAuthHandlers } from './ipc/auth.js'
 import { registerSyncHandlers } from './ipc/sync.js'
 import { registerTagHandlers } from './ipc/tags.js'
 import { registerLogHandlers } from './ipc/logs.js'
+import { registerServerConfigHandlers } from './ipc/serverConfig.js'
 
 // __dirname 在 CommonJS 中全局可用，无需声明
 
@@ -36,6 +37,13 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
+  // F12 打开 DevTools
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow?.webContents.toggleDevTools()
+    }
+  })
+
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
   })
@@ -57,6 +65,7 @@ app.whenReady().then(() => {
   registerSyncHandlers()
   registerTagHandlers(mainWindow!)
   registerLogHandlers()
+  registerServerConfigHandlers()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

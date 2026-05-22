@@ -50,17 +50,35 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
 
       let id: number
       if (taskData._remoteId) {
-        id = execute(
-          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
+        id = taskData._remoteId
+        execute(
+          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [taskData._remoteId, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+           taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+           newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']
+        )
+      } else if (taskData._clientId) {
+        id = taskData._clientId
+        // 如果本地已存在该 ID，换用 generateId 避免覆盖已有数据
+        if (queryOne('SELECT 1 FROM tasks WHERE id = ?', [id])) {
+          id = generateId()
+        }
+        execute(
+          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+           taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+           newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']
         )
       } else {
         id = generateId()
         execute(
-          `INSERT INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null, taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null, newPosition]
+          `INSERT OR REPLACE INTO tasks (id, title, description, project_id, parent_id, status, priority, start_date, end_date, position, seq_number, seq_assigned, images)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, taskData.title, taskData.description || '', taskData.project_id || 1, taskData.parent_id || null,
+           taskData.status || 'todo', taskData.priority || 'medium', taskData.start_date || null, taskData.end_date || null,
+           newPosition, taskData.seq_number || 0, taskData.seq_assigned || 0, taskData.images || '[]']
         )
       }
 
@@ -122,9 +140,14 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
         fields.push('parent_id = ?')
         values.push(data.parent_id)
       }
+      if (data.images !== undefined) {
+        fields.push('images = ?')
+        values.push(data.images)
+      }
 
       fields.push('sync_version = 0')
-      fields.push('updated_at = CURRENT_TIMESTAMP')
+      fields.push('updated_at = ?')
+      values.push(new Date().toISOString())
       values.push(id)
 
       execute(
@@ -158,6 +181,10 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
   ipcMain.handle('tasks:delete', async (_event, id: number) => {
     try {
       await initDatabase()
+      execute('DELETE FROM task_logs WHERE task_id IN (SELECT id FROM tasks WHERE parent_id = ?)', [id])
+      execute('DELETE FROM task_logs WHERE task_id = ?', [id])
+      execute('DELETE FROM task_tags WHERE task_id = ?', [id])
+      execute('DELETE FROM tasks WHERE parent_id = ?', [id])
       execute('DELETE FROM tasks WHERE id = ?', [id])
 
       // 通知渲染进程
@@ -173,17 +200,15 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
     try {
       await initDatabase()
 
-      // 使用事务批量更新
+      const now = new Date().toISOString()
       for (const update of updates) {
         execute(
-          'UPDATE tasks SET status = ?, position = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-          [update.status, update.position, update.id]
+          'UPDATE tasks SET status = ?, position = ?, sync_version = 0, updated_at = ? WHERE id = ?',
+          [update.status, update.position, now, update.id]
         )
       }
 
       saveDatabase()
-
-      // 通知渲染进程刷新
       mainWindow.webContents.send('tasks-reordered')
     } catch (error) {
       console.error('Error reordering tasks:', error)
@@ -194,10 +219,10 @@ export function registerTaskHandlers(mainWindow: BrowserWindow) {
   // 批量保存（同步下载的数据）
   ipcMain.handle('tasks:save-all', async (_event, data: any[]) => {
     await initDatabase()
-    const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'sync_version', 'created_at', 'updated_at']
+    const cols = ['id', 'title', 'description', 'project_id', 'parent_id', 'status', 'priority', 'start_date', 'end_date', 'position', 'seq_number', 'seq_assigned', 'images', 'sync_version', 'created_at', 'updated_at']
     for (const t of data) {
       try {
-        const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()]
+        const vals = [t.id, t.title, t.description || '', t.project_id, t.parent_id ?? null, t.status || 'todo', t.priority || 'medium', t.start_date ?? null, t.end_date ?? null, t.position || 0, t.seq_number || 0, t.seq_assigned || 0, t.images || '[]', t.sync_version || 0, t.created_at || new Date().toISOString(), t.updated_at || new Date().toISOString()]
         const existing = queryOne('SELECT id FROM tasks WHERE id = ?', [t.id])
         if (existing) {
           execute(`UPDATE tasks SET ${cols.map(c => `${c}=?`).join(',')} WHERE id=?`, [...vals, t.id])

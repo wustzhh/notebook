@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { initDatabase, queryAll, queryOne, execute } from '../database.js'
+import { initDatabase, queryAll, queryOne, execute, generateId } from '../database.js'
 
 export function registerLogHandlers() {
   ipcMain.handle('logs:get-by-task', async (_event, taskId: number) => {
@@ -15,10 +15,24 @@ export function registerLogHandlers() {
   ipcMain.handle('logs:create', async (_event, data: any) => {
     try {
       await initDatabase()
+      let id: number
+      if (data._remoteId) {
+        id = data._remoteId
+      } else if (data._clientId) {
+        id = data._clientId
+        if (queryOne('SELECT 1 FROM task_logs WHERE id = ?', [id])) {
+          id = generateId()
+        }
+      } else if (data.id) {
+        id = data.id
+      } else {
+        id = generateId()
+      }
       execute(
-        'INSERT INTO task_logs (task_id, type, content, old_value, new_value, field) VALUES (?, ?, ?, ?, ?, ?)',
-        [data.task_id, data.type, data.content, data.old_value || null, data.new_value || null, data.field || null]
+        'INSERT INTO task_logs (id, task_id, type, content, old_value, new_value, field, images, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, data.task_id, data.type, data.content, data.old_value || null, data.new_value || null, data.field || null, data.images || '[]', data.created_at || new Date().toISOString()]
       )
+      return id
     } catch (error) {
       console.error('Error creating log:', error)
       throw error
@@ -47,10 +61,10 @@ export function registerLogHandlers() {
 
   ipcMain.handle('logs:save-all', async (_event, data: any[]) => {
     await initDatabase()
-    const cols = ['id', 'task_id', 'type', 'content', 'old_value', 'new_value', 'field', 'created_at']
+    const cols = ['id', 'task_id', 'type', 'content', 'old_value', 'new_value', 'field', 'images', 'created_at']
     for (const l of data) {
       if (l.type !== 'comment') continue
-      const vals = [l.id, l.task_id, l.type, l.content, l.old_value || null, l.new_value || null, l.field || null, l.created_at || new Date().toISOString()]
+      const vals = [l.id, l.task_id, l.type, l.content, l.old_value || null, l.new_value || null, l.field || null, l.images || '[]', l.created_at || new Date().toISOString()]
       const existing = queryOne('SELECT id FROM task_logs WHERE id = ?', [l.id])
       if (!existing) {
         try {
