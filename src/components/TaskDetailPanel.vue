@@ -42,7 +42,7 @@
       <div class="field-group" :class="{ editing: editingField === 'status' }">
         <label @click="startEdit('status')">状态</label>
         <template v-if="editingField === 'status'">
-          <el-select v-model="editForm.status" @change="saveField('status')" size="default">
+          <el-select v-model="editForm.status" @visible-change="(v: boolean) => { if (!v) saveField('status') }" size="default">
             <el-option label="待办" value="todo" />
             <el-option label="进行中" value="in_progress" />
             <el-option label="审核中" value="review" />
@@ -58,7 +58,7 @@
       <div v-if="!isSubtask" class="field-group" :class="{ editing: editingField === 'priority' }">
         <label @click="startEdit('priority')">优先级</label>
         <template v-if="editingField === 'priority'">
-          <el-select v-model="editForm.priority" @change="saveField('priority')" size="default">
+          <el-select v-model="editForm.priority" @visible-change="(v: boolean) => { if (!v) saveField('priority') }" size="default">
             <el-option label="低" value="low" />
             <el-option label="中" value="medium" />
             <el-option label="高" value="high" />
@@ -144,8 +144,18 @@
               @change="(val) => toggleSubtaskDone(subtask.id, val as boolean)"
             />
             <span class="subtask-key">{{ task.project_key }}-{{ subtask.seq_assigned ? subtask.seq_number : '?' }}</span>
-            <span class="subtask-title">{{ subtask.title }}</span>
+            <template v-if="editingSubtaskId === subtask.id">
+              <el-input
+                :ref="(el: any) => { subtaskTitleInputRef = el }"
+                v-model="editingSubtaskTitle"
+                size="small"
+                @blur="saveSubtaskTitle(subtask.id)"
+                @keyup.enter="saveSubtaskTitle(subtask.id)"
+              />
+            </template>
+            <span v-else class="subtask-title" @dblclick.stop="startEditSubtask(subtask)">{{ subtask.title }}</span>
             <StatusTag :status="subtask.status" size="small" />
+            <el-button link size="small" class="subtask-delete" @click.stop="handleDeleteSubtask(subtask.id)"><el-icon><Close /></el-icon></el-button>
           </div>
         </div>
 
@@ -217,7 +227,15 @@
           </div>
         </div>
         <div style="display:flex;gap:4px">
-          <textarea v-model="commentText" placeholder="添加评论..." class="comment-textarea" @keyup.enter="sendComment" @paste="handleCommentPaste" rows="1"></textarea>
+          <textarea
+            ref="commentTextareaRef"
+            v-model="commentText"
+            placeholder="添加评论... (Enter 发送, Shift+Enter 换行)"
+            class="comment-textarea"
+            @paste="handleCommentPaste"
+            @input="autoResizeComment"
+            rows="1"
+          ></textarea>
           <el-button size="small" @click="triggerImageInput('comment')">📷</el-button>
           <el-button size="small" type="primary" @click="sendComment">发送</el-button>
         </div>
@@ -273,6 +291,7 @@ const commentImages = ref<ImageItem[]>([])
 const descImageInput = ref<HTMLInputElement | null>(null)
 const commentImageInput = ref<HTMLInputElement | null>(null)
 const descTextareaRef = ref<HTMLTextAreaElement | null>(null)
+const commentTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const descReadImages = computed(() => task.value ? parseImages((task.value as any).images) : [])
 function parseLogImages(raw: string) { return parseImages(raw) }
@@ -380,6 +399,40 @@ async function sendComment() {
   })
   commentText.value = ''
   commentImages.value = []
+  autoResizeComment()
+}
+
+// 原生 keydown 监听（绕过 Vue 编译修饰符的潜在问题）
+function onCommentKeydown(e: Event) {
+  const ke = e as KeyboardEvent
+  if (ke.key !== 'Enter') return
+  if (ke.shiftKey) {
+    // Shift+Enter: insert newline
+    // 让浏览器默认行为插入换行，不阻止
+    return
+  }
+  // Enter alone: submit and prevent newline
+  e.preventDefault()
+  sendComment()
+}
+
+// 监听 activeTab，切换到 activity 时挂载原生 keydown 监听
+//（textarea 在 v-if 内，组件 mount 时 DOM 还未生成）
+watch(activeTab, (tab) => {
+  if (tab === 'activity') {
+    nextTick(() => {
+      commentTextareaRef.value?.addEventListener('keydown', onCommentKeydown)
+    })
+  } else {
+    commentTextareaRef.value?.removeEventListener('keydown', onCommentKeydown)
+  }
+})
+
+function autoResizeComment() {
+  const el = commentTextareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 200) + 'px'
 }
 
 function startEditLog(log: any) {
@@ -433,6 +486,9 @@ async function removeTagFromTask(tagId: number) {
 }
 
 const editingField = ref<string | null>(null)
+const editingSubtaskId = ref<number | null>(null)
+const editingSubtaskTitle = ref('')
+const subtaskTitleInputRef = ref<any>(null)
 const editForm = ref<Partial<Task>>({})
 
 const showAddSubtask = ref(false)
@@ -472,7 +528,10 @@ watch(previewImage, (val) => {
   if (val) document.addEventListener('keydown', handlePreviewEsc)
   else document.removeEventListener('keydown', handlePreviewEsc)
 })
-onUnmounted(() => document.removeEventListener('keydown', handlePreviewEsc))
+onUnmounted(() => {
+  document.removeEventListener('keydown', handlePreviewEsc)
+  commentTextareaRef.value?.removeEventListener('keydown', onCommentKeydown)
+})
 
 function formatDateTime(date: string) {
   return date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'
@@ -568,6 +627,33 @@ async function toggleSubtaskDone(subtaskId: number, done: boolean) {
     await taskStore.toggleSubtaskDone(subtaskId, done)
   } catch (e: any) {
     ElMessage.error(e.message || '操作失败')
+  }
+}
+
+async function handleDeleteSubtask(subtaskId: number) {
+  try {
+    await taskStore.deleteTask(subtaskId)
+  } catch (e: any) {
+    ElMessage.error(e.message || '操作失败')
+  }
+}
+
+function startEditSubtask(subtask: any) {
+  editingSubtaskId.value = subtask.id
+  editingSubtaskTitle.value = subtask.title
+  nextTick(() => {
+    subtaskTitleInputRef.value?.focus()
+  })
+}
+
+async function saveSubtaskTitle(subtaskId: number) {
+  const title = editingSubtaskTitle.value.trim()
+  editingSubtaskId.value = null
+  if (!title) return
+  try {
+    await taskStore.updateTask(subtaskId, { title } as any)
+  } catch (e: any) {
+    ElMessage.error(e.message || '编辑失败')
   }
 }
 
@@ -765,9 +851,9 @@ function openParentTask() {
 
 .subtask-title {
   flex: 1;
+  min-width: 0;
   font-size: 13px;
   color: var(--text-primary);
-  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -776,6 +862,10 @@ function openParentTask() {
 .subtask-title:hover {
   color: var(--link-color, #409eff);
 }
+
+.subtask-delete { opacity: 0; transition: opacity 0.15s; color: var(--text-tertiary); margin-left: auto; flex-shrink: 0; }
+.subtask-item:hover .subtask-delete { opacity: 1; }
+.subtask-delete:hover { color: #f56c6c; }
 
 .subtask-add {
   margin-bottom: 8px;
@@ -846,7 +936,7 @@ function openParentTask() {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
 }
 .log-time { font-size: 11px; color: var(--text-tertiary); min-width: 70px; }
-.log-content { flex: 1; font-size: 13px; color: var(--text-primary); cursor: default; }
+.log-content { flex: 1; font-size: 13px; color: var(--text-primary); cursor: default; white-space: pre-wrap; word-wrap: break-word; }
 .log-type-badge.comment { font-size: 10px; background: #409eff22; color: #409eff; padding: 1px 6px; border-radius: 8px; }
 .log-delete { opacity: 0; transition: opacity 0.15s; color: var(--text-tertiary); }
 .log-item:hover .log-delete { opacity: 1; }
@@ -866,5 +956,5 @@ function openParentTask() {
 .image-preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; }
 .image-preview-overlay img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
 .desc-textarea { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: none; font-size: 13px; background: var(--bg-primary); color: var(--text-primary); min-height: 80px; overflow-y: hidden; }
-.comment-textarea { flex: 1; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: none; font-size: 13px; background: var(--bg-primary); color: var(--text-primary); }
+.comment-textarea { flex: 1; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; resize: none; font-size: 13px; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; min-height: 28px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
 </style>
