@@ -240,6 +240,7 @@ function formatDate(date: string) {
   display: flex;
   max-width: 100%;
   overflow: hidden;
+  flex-shrink: 0;
   transition: background-color 0.3s ease, box-shadow 0.3s ease, opacity 0.2s ease;
   user-select: none;
 }
